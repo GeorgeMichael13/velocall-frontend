@@ -9,22 +9,22 @@ export default function VideoGrid() {
   const { myVideo, userVideo, callAccepted, callEnded, isCameraOff, stream } =
     useSocket();
 
-  // This ref ensures we only attach the stream ONCE per session
   const isStreamAttached = useRef(false);
 
   useEffect(() => {
-    // Check if the stream exists and if we haven't already locked it in
     if (stream && myVideo.current && !isStreamAttached.current) {
       myVideo.current.srcObject = stream;
       isStreamAttached.current = true;
 
-      // Force play to prevent the "black screen" or "blink" on load
-      myVideo.current
-        .play()
-        .catch((err) => console.error("Autoplay failed:", err));
+      // FIXED: Added type 'any' to err to satisfy Netlify's TypeScript check
+      myVideo.current.play().catch((err: any) => {
+        console.warn(
+          "Autoplay was prevented, waiting for user interaction:",
+          err,
+        );
+      });
     }
 
-    // Cleanup: If the stream changes, allow re-attachment
     return () => {
       isStreamAttached.current = false;
     };
@@ -43,7 +43,7 @@ export default function VideoGrid() {
       </header>
 
       <div className="flex-1 w-full h-full p-4 flex flex-col md:flex-row gap-4 items-center justify-center">
-        {/* LOCAL FEED (YOUR SELFIE VIEW) */}
+        {/* LOCAL FEED (YOUR MIRRORED SELFIE VIEW) */}
         <div
           className={cn(
             "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl transition-all duration-700 w-full aspect-video border border-white/5",
@@ -59,8 +59,7 @@ export default function VideoGrid() {
               "w-full h-full object-cover",
               isCameraOff ? "opacity-0" : "opacity-100",
             )}
-            /* STRIKE-ZONE: The Mirror Fix */
-            /* scaleX(-1) flips the image horizontally like a real mirror/selfie cam */
+            /* Mirror Fix: This flips the video correctly like a real selfie camera */
             style={{
               transform: "scaleX(-1)",
               WebkitTransform: "scaleX(-1)",
@@ -78,7 +77,7 @@ export default function VideoGrid() {
           <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider">
-              You (Selfie View)
+              You
             </span>
           </div>
         </div>
@@ -100,7 +99,6 @@ export default function VideoGrid() {
             </div>
           </div>
         ) : (
-          /* WAITING ROOM */
           <div
             className={cn(
               "relative bg-white/[0.02] border border-dashed border-white/10 rounded-3xl flex-1 md:max-w-[50%] aspect-video flex flex-col items-center justify-center gap-4 transition-all duration-1000",
@@ -124,6 +122,8 @@ export default function VideoGrid() {
           </div>
         )}
       </div>
+
+      <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
     </div>
   );
 }
