@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  /* The New VeloCall: White, Red, and Deep Black */
+  --color-velo-primary: #FF0000;    /* Pure Red: For actions/alerts */
+  --color-velo-secondary: #121212;  /* Rich Black: For sidebars */
+  --color-velo-accent: #FFFFFF;     /* Pure White: For text/icons */
+  --color-velo-dark: #000000;       /* Pitch Black: The Stage */
+}
+
+body {
+  background-color: var(--color-velo-dark);
+  color: var(--color-velo-accent);
+  min-height: 100vh;
+  font-family: var(--font-geist-sans);
+}
+
+/* Updated Glassmorphism for High Contrast */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
