@@ -12,21 +12,21 @@ export default function VideoGrid() {
   const isStreamAttached = useRef(false);
 
   useEffect(() => {
-    // NEW FEATURE: Strict Attachment & Play Logic to stop the blinking loop
-    if (stream && myVideo.current) {
-      // Only attach if the stream has actually changed or isn't there
-      if (myVideo.current.srcObject !== stream) {
-        myVideo.current.srcObject = stream;
+    const videoElement = myVideo.current;
+
+    if (stream && videoElement) {
+      // 1. Only attach if the stream is actually new
+      if (videoElement.srcObject !== stream) {
+        videoElement.srcObject = stream;
         isStreamAttached.current = true;
       }
 
-      // Only attempt to play if the video is currently paused
-      // This prevents the "AbortError: interrupted by a new load request"
-      if (myVideo.current.paused) {
-        myVideo.current.play().catch((err: any) => {
-          // Ignore AbortErrors in the console as they are normal during rapid UI updates
+      // 2. Only call play() if it's paused. This stops the "AbortError" loop.
+      if (videoElement.paused) {
+        videoElement.play().catch((err: any) => {
+          // Ignore AbortError (it's just a race condition)
           if (err.name !== "AbortError") {
-            console.warn("Autoplay was prevented:", err);
+            console.warn("Autoplay interaction required", err);
           }
         });
       }
@@ -50,7 +50,7 @@ export default function VideoGrid() {
       </header>
 
       <div className="flex-1 w-full h-full p-4 flex flex-col md:flex-row gap-4 items-center justify-center">
-        {/* LOCAL FEED (YOUR MIRRORED SELFIE VIEW) */}
+        {/* LOCAL FEED */}
         <div
           className={cn(
             "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl transition-all duration-700 w-full aspect-video border border-white/5",
@@ -66,12 +66,10 @@ export default function VideoGrid() {
               "w-full h-full object-cover",
               isCameraOff ? "opacity-0" : "opacity-100",
             )}
-            /* Mirror Fix: We use scaleX(1) here because scaleX(-1) was likely 
-               over-correcting your hardware's natural selfie-flip. 
-            */
+            /* MAINTAINED: Your original mirroring logic */
             style={{
-              transform: "scaleX(1)",
-              WebkitTransform: "scaleX(1)",
+              transform: "scaleX(-1)",
+              WebkitTransform: "scaleX(-1)",
             }}
           />
 
@@ -98,7 +96,6 @@ export default function VideoGrid() {
               ref={userVideo}
               autoPlay
               playsInline
-              /* NO mirror on remote video */
               className="w-full h-full object-cover"
             />
             <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
