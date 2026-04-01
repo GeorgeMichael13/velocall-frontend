@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { VideoOff, Zap, LoaderCircle, UserPlus } from "lucide-react";
 import { useSocket } from "@/app/context/SocketContext";
 import { cn } from "@/lib/utils";
@@ -9,16 +9,20 @@ export default function VideoGrid() {
   const { myVideo, userVideo, callAccepted, callEnded, isCameraOff, stream } =
     useSocket();
 
-  // STABILIZATION: This ensures the stream is attached once and doesn't flicker on re-renders
+  // Use a local ref to track if we've already attached the stream
+  // to prevent the "Blink" during React re-renders
+  const attachedStream = useRef<MediaStream | null>(null);
+
   useEffect(() => {
-    if (stream && myVideo.current && !myVideo.current.srcObject) {
+    if (stream && myVideo.current && attachedStream.current !== stream) {
+      console.log("Attaching local stream...");
       myVideo.current.srcObject = stream;
+      attachedStream.current = stream;
     }
   }, [stream, myVideo]);
 
   return (
     <div className="relative flex-1 w-full h-screen bg-[#050505] overflow-hidden flex flex-col">
-      {/* 1. THE ONLY TOP ELEMENT: ANIMATED VELOCALL PILL */}
       <header className="absolute top-6 left-0 w-full z-50 flex items-center justify-center pointer-events-none">
         <div className="flex items-center gap-2 animate-bounce py-1.5 px-4 bg-white/5 backdrop-blur-2xl rounded-full border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
           <Zap className="text-yellow-400 w-3 h-3 fill-yellow-400" />
@@ -29,9 +33,8 @@ export default function VideoGrid() {
         </div>
       </header>
 
-      {/* 2. THE VIDEO GRID */}
       <div className="flex-1 w-full h-full p-4 flex flex-col md:flex-row gap-4 items-center justify-center">
-        {/* LOCAL FEED */}
+        {/* LOCAL FEED (YOU) */}
         <div
           className={cn(
             "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl transition-all duration-700 w-full aspect-video border border-white/5",
@@ -43,16 +46,17 @@ export default function VideoGrid() {
             autoPlay
             playsInline
             muted
-            // ADDED: ensure the video doesn't pause itself
             onLoadedMetadata={(e) => e.currentTarget.play()}
             className={cn(
-              "w-full h-full object-cover transition-transform duration-500",
-              "scale-x-[-1]", // Mirror effect
+              "w-full h-full object-cover transition-opacity duration-500",
+              // FIX: This ensures YOU look like a mirror to yourself.
+              // If it's "inverted to the left", we ensure transform is clean.
+              "scale-x-[-1]",
               isCameraOff ? "opacity-0" : "opacity-100",
             )}
+            style={{ transform: "scaleX(-1)" }} // Hard-coded fallback for the mirror effect
           />
 
-          {/* Privacy Overlay */}
           {isCameraOff && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0D0D0D]">
               <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
@@ -61,7 +65,6 @@ export default function VideoGrid() {
             </div>
           )}
 
-          {/* User Name Badge */}
           <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider">
@@ -70,7 +73,7 @@ export default function VideoGrid() {
           </div>
         </div>
 
-        {/* REMOTE FEED OR WAITING STATE */}
+        {/* REMOTE FEED (THE OTHER PERSON) */}
         {callAccepted && !callEnded ? (
           <div className="relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl flex-1 md:max-w-[50%] aspect-video border border-white/5 animate-in fade-in zoom-in-95 duration-700">
             <video
@@ -78,6 +81,7 @@ export default function VideoGrid() {
               autoPlay
               playsInline
               onLoadedMetadata={(e) => e.currentTarget.play()}
+              // REMOTE VIDEO SHOULD NOT BE MIRRORED
               className="w-full h-full object-cover"
             />
             <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
@@ -87,11 +91,9 @@ export default function VideoGrid() {
             </div>
           </div>
         ) : (
-          /* WAITING ROOM UI */
           <div
             className={cn(
               "relative bg-white/[0.02] border border-dashed border-white/10 rounded-3xl flex-1 md:max-w-[50%] aspect-video flex flex-col items-center justify-center gap-4 transition-all duration-1000",
-              "opacity-100 visible",
             )}
           >
             <div className="relative">
@@ -112,9 +114,6 @@ export default function VideoGrid() {
           </div>
         )}
       </div>
-
-      {/* 3. SUBTLE AMBIENT GRADIENT */}
-      <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
     </div>
   );
 }
