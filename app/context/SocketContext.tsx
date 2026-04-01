@@ -36,7 +36,7 @@ export const ContextProvider = ({
   const [name, setName] = useState("");
   const [otherUser, setOtherUser] = useState("");
   const [view, setView] = useState("room");
-  const [roomId, setRoomId] = useState(""); // Track the current Room ID
+  const [roomId, setRoomId] = useState("");
 
   const [messages, setMessages] = useState<any[]>([]);
   const [code, setCode] = useState("// Real-time collaborative editor...");
@@ -48,37 +48,8 @@ export const ContextProvider = ({
   const userVideo = useRef<HTMLVideoElement>(null);
   const connectionRef = useRef<any>(null);
 
-  // Helper function to handle answering (used for auto-answer)
-  const handleIncomingCall = (incomingSignal: any, from: string) => {
-    if (!Peer) return;
-
-    setCallAccepted(true);
-    const peer = new Peer({
-      initiator: false,
-      trickle: false,
-      stream,
-      config: { iceServers },
-    });
-
-    peer.on("signal", (data: any) =>
-      socket.emit("answerCall", { signal: data, to: from }),
-    );
-
-   peer.on("stream", (remoteStream: MediaStream) => {
-  console.log("Remote stream received!");
-  if (userVideo.current) {
-    userVideo.current.srcObject = remoteStream;
-    // Force the video to play
-    userVideo.current.play().catch(e => console.error("Error playing video:", e));
-  }
-});
-
-    peer.signal(incomingSignal);
-    connectionRef.current = peer;
-  };
-
   useEffect(() => {
-    // @ts-ignore - Suppresses TypeScript error for missing type definitions in production build
+    // @ts-ignore
     import("simple-peer").then((module) => {
       const PeerConstructor = module.default;
       setPeer(() => PeerConstructor);
@@ -96,43 +67,37 @@ export const ContextProvider = ({
 
     socket.on("me", (id) => {
       setMe(id);
-
       const urlParams = new URLSearchParams(window.location.search);
       let rId = urlParams.get("id");
-
       if (!rId) {
         rId = Math.random().toString(36).substring(2, 10);
         const newUrl = `${window.location.pathname}?id=${rId}`;
         window.history.replaceState(null, "", newUrl);
       }
-
       setRoomId(rId);
       socket.emit("join-room", rId);
     });
 
     socket.on("user-joined", (newUserSocketId) => {
-      console.log("New user detected in room:", newUserSocketId);
+      console.log("New user detected:", newUserSocketId);
       setTimeout(() => {
         callUser(newUserSocketId);
       }, 1000);
     });
 
-    // --- UPDATED FOR AUTO-ANSWER ---
     socket.on("callUser", ({ from, name: callerName, signal }) => {
-      console.log("Receiving call from:", from);
       setCall({ isReceivingCall: true, from, name: callerName, signal });
       setOtherUser(from);
 
-      // Auto-answer logic: If we receive a call signal, answer it automatically after 1 second
+      // AUTO-ANSWER LOGIC with Force-Play
       setTimeout(() => {
-        console.log("Auto-answering call...");
-        // We call the logic directly here to ensure the state is fresh
-        if (Peer && !callAccepted) {
+        if (Peer && !callAccepted && stream) {
+          console.log("Auto-answering incoming stream...");
           setCallAccepted(true);
           const peer = new Peer({
             initiator: false,
             trickle: false,
-            stream: stream, // Use the stream from state
+            stream: stream,
             config: { iceServers },
           });
 
@@ -141,8 +106,12 @@ export const ContextProvider = ({
           );
 
           peer.on("stream", (remoteStream: MediaStream) => {
+            console.log("Remote stream received in auto-answer");
             if (userVideo.current) {
               userVideo.current.srcObject = remoteStream;
+              userVideo.current
+                .play()
+                .catch((e) => console.error("Playback error:", e));
             }
           });
 
@@ -167,9 +136,7 @@ export const ContextProvider = ({
     socket.on("codeUpdate", (newCode) => setCode(newCode));
 
     socket.on("callEnded", () => {
-      if (connectionRef.current) {
-        connectionRef.current.destroy();
-      }
+      if (connectionRef.current) connectionRef.current.destroy();
       setCallEnded(true);
       window.location.reload();
     });
@@ -181,21 +148,20 @@ export const ContextProvider = ({
       socket.off("messageReceived");
       socket.off("codeUpdate");
     };
-  }, [me, Peer, stream]); // Added Peer and stream to dependencies for safety
+  }, [me, Peer, stream]);
 
   const sendMessage = (text: string) => {
-    const msgData = {
+    socket.emit("sendMessage", {
       text,
       from: me,
       name: name || "Anonymous",
-      roomId: roomId,
-    };
-    socket.emit("sendMessage", msgData);
+      roomId,
+    });
   };
 
   const updateCode = (newCode: string) => {
     setCode(newCode);
-    socket.emit("codeUpdate", { code: newCode, roomId: roomId });
+    socket.emit("codeUpdate", { code: newCode, roomId });
   };
 
   const toggleMute = () => {
@@ -218,11 +184,8 @@ export const ContextProvider = ({
     try {
       const screenStream = await (
         navigator.mediaDevices as any
-      ).getDisplayMedia({
-        cursor: true,
-      });
+      ).getDisplayMedia({ cursor: true });
       const screenTrack = screenStream.getVideoTracks()[0];
-
       if (connectionRef.current) {
         connectionRef.current.replaceTrack(
           stream?.getVideoTracks()[0],
@@ -230,7 +193,6 @@ export const ContextProvider = ({
           stream,
         );
       }
-
       screenTrack.onended = () => {
         if (connectionRef.current) {
           connectionRef.current.replaceTrack(
@@ -241,85 +203,65 @@ export const ContextProvider = ({
         }
       };
     } catch (error) {
-      console.error("Error sharing screen:", error);
+      console.error("Screen share error:", error);
     }
   };
 
   const answerCall = () => {
-    if (!Peer || !call.signal)
-      return console.error("Peer library or signal missing");
-
-    try {
-      setCallAccepted(true);
-      const peer = new Peer({
-        initiator: false,
-        trickle: false,
-        stream,
-        config: { iceServers },
-      });
-
-      peer.on("signal", (data: any) =>
-        socket.emit("answerCall", { signal: data, to: call.from }),
-      );
-
-      peer.on("stream", (remoteStream: MediaStream) => {
-        if (userVideo.current) {
-          userVideo.current.srcObject = remoteStream;
-        }
-      });
-
-      peer.signal(call.signal);
-      connectionRef.current = peer;
-    } catch (err) {
-      console.error("Error answering call:", err);
-    }
+    if (!Peer || !call.signal) return;
+    setCallAccepted(true);
+    const peer = new Peer({
+      initiator: false,
+      trickle: false,
+      stream,
+      config: { iceServers },
+    });
+    peer.on("signal", (data: any) =>
+      socket.emit("answerCall", { signal: data, to: call.from }),
+    );
+    peer.on("stream", (remoteStream: MediaStream) => {
+      if (userVideo.current) {
+        userVideo.current.srcObject = remoteStream;
+        userVideo.current.play().catch((e) => console.error(e));
+      }
+    });
+    peer.signal(call.signal);
+    connectionRef.current = peer;
   };
 
   const callUser = (id: string) => {
-    if (!Peer) return console.warn("Waiting for Peer library...");
-
-    try {
-      const peer = new Peer({
-        initiator: true,
-        trickle: false,
-        stream,
-        config: { iceServers },
-      });
-      setOtherUser(id);
-
-      peer.on("signal", (data: any) =>
-        socket.emit("callUser", {
-          userToCall: id,
-          signalData: data,
-          from: me,
-          name,
-        }),
-      );
-
-      peer.on("stream", (remoteStream: MediaStream) => {
-        if (userVideo.current) {
-          userVideo.current.srcObject = remoteStream;
-        }
-      });
-
-      socket.on("callAccepted", (signal) => {
-        setCallAccepted(true);
-        peer.signal(signal);
-      });
-
-      connectionRef.current = peer;
-    } catch (err) {
-      console.error("Error calling user:", err);
-    }
+    if (!Peer || !stream) return;
+    const peer = new Peer({
+      initiator: true,
+      trickle: false,
+      stream,
+      config: { iceServers },
+    });
+    setOtherUser(id);
+    peer.on("signal", (data: any) =>
+      socket.emit("callUser", {
+        userToCall: id,
+        signalData: data,
+        from: me,
+        name,
+      }),
+    );
+    peer.on("stream", (remoteStream: MediaStream) => {
+      if (userVideo.current) {
+        userVideo.current.srcObject = remoteStream;
+        userVideo.current.play().catch((e) => console.error(e));
+      }
+    });
+    socket.on("callAccepted", (signal) => {
+      setCallAccepted(true);
+      peer.signal(signal);
+    });
+    connectionRef.current = peer;
   };
 
   const leaveCall = () => {
     socket.emit("leaveCall", { to: otherUser });
-
-    if (connectionRef.current) {
-      connectionRef.current.destroy();
-    }
-
+    if (connectionRef.current) connectionRef.current.destroy();
     setCallEnded(true);
     window.location.href = "/";
   };

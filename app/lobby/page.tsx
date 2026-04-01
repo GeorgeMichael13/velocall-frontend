@@ -9,7 +9,6 @@ import {
   VideoOff,
   Copy,
   Check,
-  ArrowRight,
   Zap,
   Calendar,
   Plus,
@@ -24,7 +23,7 @@ export default function Lobby() {
     isMuted,
     toggleCamera,
     isCameraOff,
-    myVideo,
+    myVideo, // This is the one we use for the preview
     stream,
   } = useSocket();
 
@@ -48,7 +47,6 @@ export default function Lobby() {
 
   const copyInviteLink = () => {
     if (!me) return;
-    // UPDATED: Points to the root URL since your project uses app/page.tsx logic
     const link = `${window.location.origin}/?id=${me}`;
     navigator.clipboard.writeText(link);
     setInviteCopied(true);
@@ -69,12 +67,15 @@ export default function Lobby() {
         {/* Left: Device Preview & "Start" Actions */}
         <div className="space-y-8">
           <div className="relative aspect-video w-full bg-[#0A0A0A] rounded-[2.5rem] overflow-hidden border border-white/5 shadow-2xl group">
+            {/* CORRECTION: Use myVideo ref here for the lobby preview */}
             <video
               playsInline
-              ref={userVideo}
+              muted
+              ref={myVideo}
               autoPlay
-              style={{ width: "100%", height: "100%" }}
+              className="w-full h-full object-cover"
             />
+
             {isCameraOff && (
               <div className="absolute inset-0 flex items-center justify-center bg-[#0D0D0D]">
                 <VideoOff className="text-white/10" size={48} />
@@ -99,7 +100,6 @@ export default function Lobby() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* UPDATED: Path points to /?id= */}
             <Link
               href={me ? `/?id=${me}` : "#"}
               className={cn(
@@ -145,7 +145,6 @@ export default function Lobby() {
                 onChange={(e) => setIdToCall(e.target.value)}
                 className="w-full bg-transparent border-b border-white/20 py-4 text-xl focus:outline-none focus:border-red-600 transition-colors placeholder:text-white/10"
               />
-              {/* UPDATED: Path points to /?id= */}
               <Link
                 href={`/?id=${idToCall}`}
                 className={`absolute right-0 bottom-3 font-bold text-sm uppercase tracking-widest transition-opacity ${idToCall ? "opacity-100" : "opacity-20 pointer-events-none"}`}
