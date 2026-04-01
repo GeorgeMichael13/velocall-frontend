@@ -47,9 +47,12 @@ export const ContextProvider = ({
 
   useEffect(() => {
     // 1. Load Peer Library
+    // @ts-ignore
     import("simple-peer").then((module) => {
       setPeer(() => module.default);
     });
+
+    // ... rest of your code
 
     // 2. Get User Media
     navigator.mediaDevices
