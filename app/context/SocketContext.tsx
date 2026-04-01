@@ -8,11 +8,9 @@ import React, {
   useContext,
 } from "react";
 import { io } from "socket.io-client";
-import { useRouter } from "next/navigation";
 
 const SocketContext = createContext<any>(null);
 
-// --- UPDATED FOR DEPLOYMENT ---
 const socket = io("https://velocall-backend.onrender.com");
 
 const iceServers = [
@@ -35,7 +33,6 @@ export const ContextProvider = ({
   const [callEnded, setCallEnded] = useState(false);
   const [name, setName] = useState("");
   const [otherUser, setOtherUser] = useState("");
-  const [view, setView] = useState("room");
   const [roomId, setRoomId] = useState("");
 
   const [messages, setMessages] = useState<any[]>([]);
@@ -49,13 +46,12 @@ export const ContextProvider = ({
   const connectionRef = useRef<any>(null);
 
   useEffect(() => {
-    // @ts-ignore
+    // 1. Load Peer Library
     import("simple-peer").then((module) => {
-      const PeerConstructor = module.default;
-      setPeer(() => PeerConstructor);
-      console.log("Peer library loaded successfully");
+      setPeer(() => module.default);
     });
 
+    // 2. Get User Media
     navigator.mediaDevices
       .getUserMedia({ video: true, audio: true })
       .then((currentStream) => {
@@ -65,21 +61,20 @@ export const ContextProvider = ({
         }
       });
 
+    // 3. Socket Listeners
     socket.on("me", (id) => {
       setMe(id);
+
+      // LOGIC: Only join a room if an ID already exists (e.g. from an invite link)
       const urlParams = new URLSearchParams(window.location.search);
-      let rId = urlParams.get("id");
-      if (!rId) {
-        rId = Math.random().toString(36).substring(2, 10);
-        const newUrl = `${window.location.pathname}?id=${rId}`;
-        window.history.replaceState(null, "", newUrl);
+      const rId = urlParams.get("id");
+      if (rId) {
+        setRoomId(rId);
+        socket.emit("join-room", rId);
       }
-      setRoomId(rId);
-      socket.emit("join-room", rId);
     });
 
     socket.on("user-joined", (newUserSocketId) => {
-      console.log("New user detected:", newUserSocketId);
       setTimeout(() => {
         callUser(newUserSocketId);
       }, 1000);
@@ -89,10 +84,8 @@ export const ContextProvider = ({
       setCall({ isReceivingCall: true, from, name: callerName, signal });
       setOtherUser(from);
 
-      // AUTO-ANSWER LOGIC with Force-Play
       setTimeout(() => {
-        if (Peer && !callAccepted && stream) {
-          console.log("Auto-answering incoming stream...");
+        if (Peer && stream && !connectionRef.current) {
           setCallAccepted(true);
           const peer = new Peer({
             initiator: false,
@@ -106,12 +99,9 @@ export const ContextProvider = ({
           );
 
           peer.on("stream", (remoteStream: MediaStream) => {
-            console.log("Remote stream received in auto-answer");
             if (userVideo.current) {
               userVideo.current.srcObject = remoteStream;
-              userVideo.current
-                .play()
-                .catch((e) => console.error("Playback error:", e));
+              userVideo.current.play().catch((e) => console.error(e));
             }
           });
 
@@ -122,28 +112,20 @@ export const ContextProvider = ({
     });
 
     socket.on("messageReceived", (msg) => {
-      const msgWithTime = {
-        ...msg,
-        time: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        isLocal: msg.from === me,
-      };
-      setMessages((prev) => [...prev, msgWithTime]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          ...msg,
+          time: new Date().toLocaleTimeString(),
+          isLocal: msg.from === me,
+        },
+      ]);
     });
 
     socket.on("codeUpdate", (newCode) => setCode(newCode));
 
     socket.on("callEnded", () => {
-      if (connectionRef.current) connectionRef.current.destroy();
-
-      // RESET UI STATES
-      setCallAccepted(false);
-      setCallEnded(true);
-
-      // Full cleanup to return to lobby
-      window.location.assign(window.location.origin);
+      leaveCall();
     });
 
     return () => {
@@ -154,7 +136,35 @@ export const ContextProvider = ({
       socket.off("codeUpdate");
       socket.off("callEnded");
     };
-  }, [me, Peer, stream, callAccepted]);
+  }, [Peer, stream]);
+
+  // NEW: Manual Room Creation
+  const createNewRoom = () => {
+    const rId = Math.random().toString(36).substring(2, 10);
+    setRoomId(rId);
+    socket.emit("join-room", rId);
+    // Explicitly navigate to the meeting URL
+    window.location.search = `?id=${rId}`;
+  };
+
+  const leaveCall = () => {
+    socket.emit("leaveCall", { to: otherUser });
+
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+
+    if (connectionRef.current) {
+      connectionRef.current.destroy();
+      connectionRef.current = null;
+    }
+
+    setCallAccepted(false);
+    setCallEnded(true);
+
+    // Hard redirect to clear all state and URL params
+    window.location.assign(window.location.origin);
+  };
 
   const sendMessage = (text: string) => {
     socket.emit("sendMessage", {
@@ -184,55 +194,6 @@ export const ContextProvider = ({
       stream.getVideoTracks()[0].enabled = !newState;
       setIsCameraOff(newState);
     }
-  };
-
-  const shareScreen = async () => {
-    try {
-      const screenStream = await (
-        navigator.mediaDevices as any
-      ).getDisplayMedia({ cursor: true });
-      const screenTrack = screenStream.getVideoTracks()[0];
-      if (connectionRef.current) {
-        connectionRef.current.replaceTrack(
-          stream?.getVideoTracks()[0],
-          screenTrack,
-          stream,
-        );
-      }
-      screenTrack.onended = () => {
-        if (connectionRef.current) {
-          connectionRef.current.replaceTrack(
-            screenTrack,
-            stream?.getVideoTracks()[0],
-            stream,
-          );
-        }
-      };
-    } catch (error) {
-      console.error("Screen share error:", error);
-    }
-  };
-
-  const answerCall = () => {
-    if (!Peer || !call.signal) return;
-    setCallAccepted(true);
-    const peer = new Peer({
-      initiator: false,
-      trickle: false,
-      stream,
-      config: { iceServers },
-    });
-    peer.on("signal", (data: any) =>
-      socket.emit("answerCall", { signal: data, to: call.from }),
-    );
-    peer.on("stream", (remoteStream: MediaStream) => {
-      if (userVideo.current) {
-        userVideo.current.srcObject = remoteStream;
-        userVideo.current.play().catch((e) => console.error(e));
-      }
-    });
-    peer.signal(call.signal);
-    connectionRef.current = peer;
   };
 
   const callUser = (id: string) => {
@@ -265,28 +226,6 @@ export const ContextProvider = ({
     connectionRef.current = peer;
   };
 
-  const leaveCall = () => {
-    // 1. Notify server/other user
-    socket.emit("leaveCall", { to: otherUser });
-
-    // 2. Physically stop camera/mic
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-    }
-
-    // 3. Destroy Peer connection
-    if (connectionRef.current) {
-      connectionRef.current.destroy();
-    }
-
-    // 4. Reset states
-    setCallAccepted(false);
-    setCallEnded(true);
-
-    // 5. Hard redirect to clear URL parameters
-    window.location.assign(window.location.origin);
-  };
-
   return (
     <SocketContext.Provider
       value={{
@@ -301,7 +240,7 @@ export const ContextProvider = ({
         me,
         callUser,
         leaveCall,
-        answerCall,
+        createNewRoom, // This is essential for the Lobby
         messages,
         sendMessage,
         code,
@@ -310,9 +249,6 @@ export const ContextProvider = ({
         toggleMute,
         isCameraOff,
         toggleCamera,
-        shareScreen,
-        view,
-        setView,
       }}
     >
       {children}
