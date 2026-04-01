@@ -137,8 +137,13 @@ export const ContextProvider = ({
 
     socket.on("callEnded", () => {
       if (connectionRef.current) connectionRef.current.destroy();
+
+      // RESET UI STATES
+      setCallAccepted(false);
       setCallEnded(true);
-      window.location.reload();
+
+      // Full cleanup to return to lobby
+      window.location.assign(window.location.origin);
     });
 
     return () => {
@@ -147,8 +152,9 @@ export const ContextProvider = ({
       socket.off("callUser");
       socket.off("messageReceived");
       socket.off("codeUpdate");
+      socket.off("callEnded");
     };
-  }, [me, Peer, stream]);
+  }, [me, Peer, stream, callAccepted]);
 
   const sendMessage = (text: string) => {
     socket.emit("sendMessage", {
@@ -260,10 +266,25 @@ export const ContextProvider = ({
   };
 
   const leaveCall = () => {
+    // 1. Notify server/other user
     socket.emit("leaveCall", { to: otherUser });
-    if (connectionRef.current) connectionRef.current.destroy();
+
+    // 2. Physically stop camera/mic
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+
+    // 3. Destroy Peer connection
+    if (connectionRef.current) {
+      connectionRef.current.destroy();
+    }
+
+    // 4. Reset states
+    setCallAccepted(false);
     setCallEnded(true);
-    window.location.href = "/";
+
+    // 5. Hard redirect to clear URL parameters
+    window.location.assign(window.location.origin);
   };
 
   return (

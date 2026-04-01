@@ -11,49 +11,54 @@ import { useSocket } from "@/app/context/SocketContext";
 
 // We wrap the content to handle the useSearchParams() hook safely in Next.js
 function HomeContent() {
-  const { callAccepted, callEnded, callUser, me } = useSocket();
+  const { callEnded } = useSocket(); // Pull callEnded to handle exit logic
   const searchParams = useSearchParams();
   const [isInMeeting, setIsInMeeting] = useState(false);
 
   useEffect(() => {
     const meetingId = searchParams.get("id");
 
-    // If there's an ID in the URL and it's not OUR own ID, try to call it
-    if (meetingId && meetingId !== me) {
-      setIsInMeeting(true);
-      if (!callAccepted && !callEnded) {
-        callUser(meetingId);
-      }
-    } else if (meetingId === me) {
-      // If the ID is ours, we are just "hosting" the room
+    // LOGIC: If there is an ID AND the call hasn't just ended, show the Meeting.
+    // If the call HAS ended, we ignore the ID so the user can see the Lobby again.
+    if (meetingId && !callEnded) {
       setIsInMeeting(true);
     } else {
+      // No ID in URL or User just clicked "Leave"? Back to the Lobby.
       setIsInMeeting(false);
-    }
-  }, [searchParams, callAccepted, callEnded, callUser, me]);
 
-  // 1. LOBBY VIEW: Show this if no meeting ID is present and no call is active
-  if (!isInMeeting && !callAccepted) {
+      // OPTIONAL: This cleans the URL in the browser bar when you leave
+      if (
+        typeof window !== "undefined" &&
+        window.location.search &&
+        callEnded
+      ) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    }
+  }, [searchParams, callEnded]);
+
+  // 1. LOBBY VIEW: Show this if no meeting ID is present or call was ended
+  if (!isInMeeting) {
     return <Lobby />;
   }
 
-  // 2. MEETING VIEW: Show the full stage
+  // 2. MEETING VIEW: Show the full stage (Edge-to-edge UI)
   return (
     <main className="flex h-screen w-full overflow-hidden bg-velo-dark text-white select-none">
-      {/* 1. Navigation Rail */}
+      {/* 1. Navigation Rail (Fixed left) */}
       <Sidebar />
 
-      {/* 2. Main Stage */}
+      {/* 2. Main Stage (Center) */}
       <section className="flex-1 flex flex-col relative overflow-hidden">
         {/* Subtle radial gradient for depth */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent pointer-events-none" />
 
-        {/* 3. The Functional Video Grid */}
+        {/* 3. The Functional Video Grid (Handles local/remote video logic) */}
         <div className="flex-1 flex flex-col overflow-hidden relative z-0">
           <VideoGrid />
         </div>
 
-        {/* 4. The Functional Control Bar (Pill) */}
+        {/* 4. The Functional Control Bar (Mute, Camera, Leave) */}
         <div className="absolute bottom-8 left-0 w-full flex justify-center z-50">
           <Controls />
         </div>
@@ -68,7 +73,7 @@ function HomeContent() {
 // Final Export wrapped in Suspense (Required for useSearchParams in Next.js)
 export default function Home() {
   return (
-    <Suspense fallback={<div className="bg-black h-screen w-full" />}>
+    <Suspense fallback={<div className="bg-[#050505] h-screen w-full" />}>
       <HomeContent />
     </Suspense>
   );
