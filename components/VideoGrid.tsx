@@ -12,17 +12,24 @@ export default function VideoGrid() {
   const isStreamAttached = useRef(false);
 
   useEffect(() => {
-    if (stream && myVideo.current && !isStreamAttached.current) {
-      myVideo.current.srcObject = stream;
-      isStreamAttached.current = true;
+    // NEW FEATURE: Strict Attachment & Play Logic to stop the blinking loop
+    if (stream && myVideo.current) {
+      // Only attach if the stream has actually changed or isn't there
+      if (myVideo.current.srcObject !== stream) {
+        myVideo.current.srcObject = stream;
+        isStreamAttached.current = true;
+      }
 
-      // FIXED: Added type 'any' to err to satisfy Netlify's TypeScript check
-      myVideo.current.play().catch((err: any) => {
-        console.warn(
-          "Autoplay was prevented, waiting for user interaction:",
-          err,
-        );
-      });
+      // Only attempt to play if the video is currently paused
+      // This prevents the "AbortError: interrupted by a new load request"
+      if (myVideo.current.paused) {
+        myVideo.current.play().catch((err: any) => {
+          // Ignore AbortErrors in the console as they are normal during rapid UI updates
+          if (err.name !== "AbortError") {
+            console.warn("Autoplay was prevented:", err);
+          }
+        });
+      }
     }
 
     return () => {
@@ -59,10 +66,12 @@ export default function VideoGrid() {
               "w-full h-full object-cover",
               isCameraOff ? "opacity-0" : "opacity-100",
             )}
-            /* Mirror Fix: This flips the video correctly like a real selfie camera */
+            /* Mirror Fix: We use scaleX(1) here because scaleX(-1) was likely 
+               over-correcting your hardware's natural selfie-flip. 
+            */
             style={{
-              transform: "scaleX(-1)",
-              WebkitTransform: "scaleX(-1)",
+              transform: "scaleX(1)",
+              WebkitTransform: "scaleX(1)",
             }}
           />
 
