@@ -47,6 +47,7 @@ export const ContextProvider = ({
   const connectionRef = useRef<any>(null);
 
   useEffect(() => {
+    // @ts-ignore - Suppresses TypeScript error for missing type definitions in production build
     import("simple-peer").then((module) => {
       const PeerConstructor = module.default;
       setPeer(() => PeerConstructor);
@@ -158,9 +159,11 @@ export const ContextProvider = ({
 
   const shareScreen = async () => {
     try {
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+      const screenStream = await (
+        navigator.mediaDevices as any
+      ).getDisplayMedia({
         cursor: true,
-      } as any);
+      });
       const screenTrack = screenStream.getVideoTracks()[0];
 
       if (connectionRef.current) {
