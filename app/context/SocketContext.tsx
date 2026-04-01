@@ -19,6 +19,8 @@ const iceServers = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
   { urls: "stun:stun2.l.google.com:19302" },
+  { urls: "stun:stun3.l.google.com:19302" },
+  { urls: "stun:stun4.l.google.com:19302" },
 ];
 
 export const ContextProvider = ({
@@ -62,11 +64,14 @@ export const ContextProvider = ({
       socket.emit("answerCall", { signal: data, to: from }),
     );
 
-    peer.on("stream", (remoteStream: MediaStream) => {
-      if (userVideo.current) {
-        userVideo.current.srcObject = remoteStream;
-      }
-    });
+   peer.on("stream", (remoteStream: MediaStream) => {
+  console.log("Remote stream received!");
+  if (userVideo.current) {
+    userVideo.current.srcObject = remoteStream;
+    // Force the video to play
+    userVideo.current.play().catch(e => console.error("Error playing video:", e));
+  }
+});
 
     peer.signal(incomingSignal);
     connectionRef.current = peer;

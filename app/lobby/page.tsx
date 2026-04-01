@@ -70,11 +70,10 @@ export default function Lobby() {
         <div className="space-y-8">
           <div className="relative aspect-video w-full bg-[#0A0A0A] rounded-[2.5rem] overflow-hidden border border-white/5 shadow-2xl group">
             <video
-              ref={myVideo}
-              autoPlay
-              muted
               playsInline
-              className={`w-full h-full object-cover scale-x-[-1] transition-opacity duration-700 ${isCameraOff ? "opacity-0" : "opacity-100"}`}
+              ref={userVideo}
+              autoPlay
+              style={{ width: "100%", height: "100%" }}
             />
             {isCameraOff && (
               <div className="absolute inset-0 flex items-center justify-center bg-[#0D0D0D]">
