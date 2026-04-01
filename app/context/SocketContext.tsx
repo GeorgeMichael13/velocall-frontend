@@ -44,7 +44,7 @@ export const ContextProvider = ({
   const [Peer, setPeer] = useState<any>(null);
   const myVideo = useRef<HTMLVideoElement>(null);
   const userVideo = useRef<HTMLVideoElement>(null);
-  const connectionRef = useRef<any>();
+  const connectionRef = useRef<any>(null);
 
   useEffect(() => {
     import("simple-peer").then((module) => {
