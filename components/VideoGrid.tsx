@@ -9,17 +9,26 @@ export default function VideoGrid() {
   const { myVideo, userVideo, callAccepted, callEnded, isCameraOff, stream } =
     useSocket();
 
-  // Use a local ref to track if we've already attached the stream
-  // to prevent the "Blink" during React re-renders
-  const attachedStream = useRef<MediaStream | null>(null);
+  // This ref ensures we only attach the stream ONCE per session
+  const isStreamAttached = useRef(false);
 
   useEffect(() => {
-    if (stream && myVideo.current && attachedStream.current !== stream) {
-      console.log("Attaching local stream...");
+    // Check if the stream exists and if we haven't already locked it in
+    if (stream && myVideo.current && !isStreamAttached.current) {
       myVideo.current.srcObject = stream;
-      attachedStream.current = stream;
+      isStreamAttached.current = true;
+
+      // Force play to prevent the "black screen" or "blink" on load
+      myVideo.current
+        .play()
+        .catch((err) => console.error("Autoplay failed:", err));
     }
-  }, [stream, myVideo]);
+
+    // Cleanup: If the stream changes, allow re-attachment
+    return () => {
+      isStreamAttached.current = false;
+    };
+  }, [stream]);
 
   return (
     <div className="relative flex-1 w-full h-screen bg-[#050505] overflow-hidden flex flex-col">
@@ -34,7 +43,7 @@ export default function VideoGrid() {
       </header>
 
       <div className="flex-1 w-full h-full p-4 flex flex-col md:flex-row gap-4 items-center justify-center">
-        {/* LOCAL FEED (YOU) */}
+        {/* LOCAL FEED (YOUR SELFIE VIEW) */}
         <div
           className={cn(
             "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl transition-all duration-700 w-full aspect-video border border-white/5",
@@ -46,15 +55,16 @@ export default function VideoGrid() {
             autoPlay
             playsInline
             muted
-            onLoadedMetadata={(e) => e.currentTarget.play()}
             className={cn(
-              "w-full h-full object-cover transition-opacity duration-500",
-              // FIX: This ensures YOU look like a mirror to yourself.
-              // If it's "inverted to the left", we ensure transform is clean.
-              "scale-x-[-1]",
+              "w-full h-full object-cover",
               isCameraOff ? "opacity-0" : "opacity-100",
             )}
-            style={{ transform: "scaleX(-1)" }} // Hard-coded fallback for the mirror effect
+            /* STRIKE-ZONE: The Mirror Fix */
+            /* scaleX(-1) flips the image horizontally like a real mirror/selfie cam */
+            style={{
+              transform: "scaleX(-1)",
+              WebkitTransform: "scaleX(-1)",
+            }}
           />
 
           {isCameraOff && (
@@ -68,20 +78,19 @@ export default function VideoGrid() {
           <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider">
-              You
+              You (Selfie View)
             </span>
           </div>
         </div>
 
-        {/* REMOTE FEED (THE OTHER PERSON) */}
+        {/* REMOTE FEED */}
         {callAccepted && !callEnded ? (
           <div className="relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl flex-1 md:max-w-[50%] aspect-video border border-white/5 animate-in fade-in zoom-in-95 duration-700">
             <video
               ref={userVideo}
               autoPlay
               playsInline
-              onLoadedMetadata={(e) => e.currentTarget.play()}
-              // REMOTE VIDEO SHOULD NOT BE MIRRORED
+              /* NO mirror on remote video */
               className="w-full h-full object-cover"
             />
             <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
@@ -91,6 +100,7 @@ export default function VideoGrid() {
             </div>
           </div>
         ) : (
+          /* WAITING ROOM */
           <div
             className={cn(
               "relative bg-white/[0.02] border border-dashed border-white/10 rounded-3xl flex-1 md:max-w-[50%] aspect-video flex flex-col items-center justify-center gap-4 transition-all duration-1000",
