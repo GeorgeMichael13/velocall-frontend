@@ -15,16 +15,14 @@ export default function VideoGrid() {
     const videoElement = myVideo.current;
 
     if (stream && videoElement) {
-      // 1. Only attach if the stream is actually new
       if (videoElement.srcObject !== stream) {
         videoElement.srcObject = stream;
         isStreamAttached.current = true;
       }
 
-      // 2. Only call play() if it's paused. This stops the "AbortError" loop.
+      // Stability Logic: Only play if paused to stop the "AbortError" glitching
       if (videoElement.paused) {
         videoElement.play().catch((err: any) => {
-          // Ignore AbortError (it's just a race condition)
           if (err.name !== "AbortError") {
             console.warn("Autoplay interaction required", err);
           }
@@ -66,10 +64,11 @@ export default function VideoGrid() {
               "w-full h-full object-cover",
               isCameraOff ? "opacity-0" : "opacity-100",
             )}
-            /* MAINTAINED: Your original mirroring logic */
+            /* FIXED: Removed the -1 flip to prevent the 'inverted left' issue. 
+               This will now show the camera's natural selfie orientation. */
             style={{
-              transform: "scaleX(-1)",
-              WebkitTransform: "scaleX(-1)",
+              transform: "scaleX(1)",
+              WebkitTransform: "scaleX(1)",
             }}
           />
 
