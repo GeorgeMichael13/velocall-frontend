@@ -56,10 +56,17 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("codeUpdate", code);
   });
 
-  // WebRTC Signaling (The Video Connection)
-  socket.on("callUser", ({ userToCall, signalData, from, name }) => {
-    io.to(userToCall).emit("callUser", { signal: signalData, from, name });
-  });
+ socket.on("callUser", ({ from, name: callerName, signal }) => {
+  // Save the call info
+  setCall({ isReceivingCall: true, from, name: callerName, signal });
+  setOtherUser(from);
+  
+  // IMMEDIATELY answer the call if we are already in the room
+  // We use a small timeout to ensure the Peer library is ready
+  setTimeout(() => {
+     answerCall(); 
+  }, 1000);
+});
 
   socket.on("answerCall", (data) => {
     io.to(data.to).emit("callAccepted", data.signal);

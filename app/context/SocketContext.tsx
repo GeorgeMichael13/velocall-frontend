@@ -46,6 +46,32 @@ export const ContextProvider = ({
   const userVideo = useRef<HTMLVideoElement>(null);
   const connectionRef = useRef<any>(null);
 
+  // Helper function to handle answering (used for auto-answer)
+  const handleIncomingCall = (incomingSignal: any, from: string) => {
+    if (!Peer) return;
+
+    setCallAccepted(true);
+    const peer = new Peer({
+      initiator: false,
+      trickle: false,
+      stream,
+      config: { iceServers },
+    });
+
+    peer.on("signal", (data: any) =>
+      socket.emit("answerCall", { signal: data, to: from }),
+    );
+
+    peer.on("stream", (remoteStream: MediaStream) => {
+      if (userVideo.current) {
+        userVideo.current.srcObject = remoteStream;
+      }
+    });
+
+    peer.signal(incomingSignal);
+    connectionRef.current = peer;
+  };
+
   useEffect(() => {
     // @ts-ignore - Suppresses TypeScript error for missing type definitions in production build
     import("simple-peer").then((module) => {
@@ -86,9 +112,39 @@ export const ContextProvider = ({
       }, 1000);
     });
 
+    // --- UPDATED FOR AUTO-ANSWER ---
     socket.on("callUser", ({ from, name: callerName, signal }) => {
+      console.log("Receiving call from:", from);
       setCall({ isReceivingCall: true, from, name: callerName, signal });
       setOtherUser(from);
+
+      // Auto-answer logic: If we receive a call signal, answer it automatically after 1 second
+      setTimeout(() => {
+        console.log("Auto-answering call...");
+        // We call the logic directly here to ensure the state is fresh
+        if (Peer && !callAccepted) {
+          setCallAccepted(true);
+          const peer = new Peer({
+            initiator: false,
+            trickle: false,
+            stream: stream, // Use the stream from state
+            config: { iceServers },
+          });
+
+          peer.on("signal", (data: any) =>
+            socket.emit("answerCall", { signal: data, to: from }),
+          );
+
+          peer.on("stream", (remoteStream: MediaStream) => {
+            if (userVideo.current) {
+              userVideo.current.srcObject = remoteStream;
+            }
+          });
+
+          peer.signal(signal);
+          connectionRef.current = peer;
+        }
+      }, 1500);
     });
 
     socket.on("messageReceived", (msg) => {
@@ -98,7 +154,7 @@ export const ContextProvider = ({
           hour: "2-digit",
           minute: "2-digit",
         }),
-        isLocal: msg.from === me, // Check if it's from us
+        isLocal: msg.from === me,
       };
       setMessages((prev) => [...prev, msgWithTime]);
     });
@@ -120,22 +176,18 @@ export const ContextProvider = ({
       socket.off("messageReceived");
       socket.off("codeUpdate");
     };
-  }, [me]);
+  }, [me, Peer, stream]); // Added Peer and stream to dependencies for safety
 
-  // --- UPDATED: SEND TO ROOM ---
   const sendMessage = (text: string) => {
     const msgData = {
       text,
       from: me,
       name: name || "Anonymous",
-      roomId: roomId, // Send to the room, not just one person
+      roomId: roomId,
     };
     socket.emit("sendMessage", msgData);
-    // Note: We don't manually setMessages here because the server
-    // broadcasts it back to everyone (including us).
   };
 
-  // --- UPDATED: UPDATE ROOM CODE ---
   const updateCode = (newCode: string) => {
     setCode(newCode);
     socket.emit("codeUpdate", { code: newCode, roomId: roomId });
@@ -189,7 +241,8 @@ export const ContextProvider = ({
   };
 
   const answerCall = () => {
-    if (!Peer) return console.error("Peer library not yet loaded");
+    if (!Peer || !call.signal)
+      return console.error("Peer library or signal missing");
 
     try {
       setCallAccepted(true);
