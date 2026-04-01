@@ -1,13 +1,20 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { VideoOff, Zap, LoaderCircle, UserPlus } from "lucide-react";
 import { useSocket } from "@/app/context/SocketContext";
 import { cn } from "@/lib/utils";
 
 export default function VideoGrid() {
-  const { myVideo, userVideo, callAccepted, callEnded, isCameraOff } =
+  const { myVideo, userVideo, callAccepted, callEnded, isCameraOff, stream } =
     useSocket();
+
+  // STABILIZATION: This ensures the stream is attached once and doesn't flicker on re-renders
+  useEffect(() => {
+    if (stream && myVideo.current && !myVideo.current.srcObject) {
+      myVideo.current.srcObject = stream;
+    }
+  }, [stream, myVideo]);
 
   return (
     <div className="relative flex-1 w-full h-screen bg-[#050505] overflow-hidden flex flex-col">
@@ -36,10 +43,12 @@ export default function VideoGrid() {
             autoPlay
             playsInline
             muted
+            // ADDED: ensure the video doesn't pause itself
+            onLoadedMetadata={(e) => e.currentTarget.play()}
             className={cn(
               "w-full h-full object-cover transition-transform duration-500",
-              "scale-x-[-1]",
-              isCameraOff ? "scale-110 opacity-0" : "scale-100 opacity-100",
+              "scale-x-[-1]", // Mirror effect
+              isCameraOff ? "opacity-0" : "opacity-100",
             )}
           />
 
@@ -68,6 +77,7 @@ export default function VideoGrid() {
               ref={userVideo}
               autoPlay
               playsInline
+              onLoadedMetadata={(e) => e.currentTarget.play()}
               className="w-full h-full object-cover"
             />
             <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
@@ -77,11 +87,10 @@ export default function VideoGrid() {
             </div>
           </div>
         ) : (
-          /* NEW FEATURE: WAITING ROOM UI (Only shows when hosting/waiting) */
+          /* WAITING ROOM UI */
           <div
             className={cn(
               "relative bg-white/[0.02] border border-dashed border-white/10 rounded-3xl flex-1 md:max-w-[50%] aspect-video flex flex-col items-center justify-center gap-4 transition-all duration-1000",
-              // If we aren't in a call yet, we hide this to keep the "Lobby-style" look from your CSS
               "opacity-100 visible",
             )}
           >
