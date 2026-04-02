@@ -178,7 +178,7 @@ export default function Lobby() {
         <div className="space-y-10">
           <div>
             <h1 className="text-6xl font-black tracking-tighter leading-none mb-4">
-              Video calls,<br />
+              Make Video calls,<br />
               <span className="text-red-600">instantly.</span>
             </h1>
             <p className="text-white/50 text-xl max-w-md">
@@ -230,7 +230,7 @@ export default function Lobby() {
             </div>
           </div>
 
-          <p className="text-white/30 text-sm text-center lg:text-left">
+          <p className="text-white/30 text-sm text-justify-center lg:text-left">
             Powered by WebRTC • End-to-end encrypted
           </p>
         </div>
