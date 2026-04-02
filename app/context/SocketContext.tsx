@@ -1,14 +1,19 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useRef, useEffect } from "react";
 import { LiveKitRoom } from "@livekit/components-react";
 import "@livekit/components-styles";
 
+// 1. Updated Type Definition to include missing build properties
 type LiveKitContextType = {
   roomName: string | null;
   joinRoom: (room: string) => Promise<void>;
   leaveRoom: () => void;
   isConnected: boolean;
+
+  // Media Refs & Streams (Fixed for the 'lobby' build error)
+  myVideo: React.RefObject<HTMLVideoElement | null>;
+  stream: MediaStream | null;
 
   // Old features preserved
   toggleMute: () => void;
@@ -34,6 +39,7 @@ const LiveKitContext = createContext<LiveKitContextType | null>(null);
 export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
   const [roomName, setRoomName] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
@@ -43,9 +49,29 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [code, setCode] = useState("// Real-time collaborative editor...");
 
+  const myVideo = useRef<HTMLVideoElement | null>(null);
+
+  // 2. Initialize local media so 'myVideo' works in the Lobby
+  useEffect(() => {
+    async function getMedia() {
+      try {
+        const currentStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+        setStream(currentStream);
+        if (myVideo.current) {
+          myVideo.current.srcObject = currentStream;
+        }
+      } catch (err) {
+        console.error("Failed to get local stream", err);
+      }
+    }
+    getMedia();
+  }, []);
+
   const joinRoom = async (room: string) => {
     const identity = `user_${Date.now()}`;
-
     try {
       const response = await fetch("https://velocall-backend.onrender.com/api/livekit-token", {
         method: "POST",
@@ -75,13 +101,24 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
     setMessages([]);
   };
 
-  const toggleMute = () => setIsMuted((prev) => !prev);
-  const toggleCamera = () => setIsCameraOff((prev) => !prev);
+  const toggleMute = () => {
+    if (stream) {
+      stream.getAudioTracks().forEach(track => track.enabled = isMuted);
+      setIsMuted((prev) => !prev);
+    }
+  };
+
+  const toggleCamera = () => {
+    if (stream) {
+      stream.getVideoTracks().forEach(track => track.enabled = isCameraOff);
+      setIsCameraOff((prev) => !prev);
+    }
+  };
+
   const toggleScreenShare = () => setIsScreenSharing((prev) => !prev);
 
   const sendReaction = (emoji: string) => {
     console.log("Reaction sent:", emoji);
-    // Can be enhanced with LiveKit data channels later
   };
 
   const toggleRaiseHand = () => setRaisedHand((prev) => !prev);
@@ -97,9 +134,7 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
     setMessages((prev) => [...prev, newMsg]);
   };
 
-  const updateCode = (newCode: string) => {
-    setCode(newCode);
-  };
+  const updateCode = (newCode: string) => setCode(newCode);
 
   return (
     <LiveKitContext.Provider
@@ -108,6 +143,8 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
         joinRoom,
         leaveRoom,
         isConnected: !!roomName && !!token,
+        myVideo,
+        stream,
         toggleMute,
         toggleCamera,
         toggleScreenShare,
