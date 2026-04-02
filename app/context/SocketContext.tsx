@@ -252,7 +252,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       if (!isScreenSharing) {
         // Start Screen Sharing
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { cursor: "always" },
+          video: { cursor: "always" } as any, // FIXED: Added 'as any' to bypass Netlify build error
           audio: false,
         });
 
