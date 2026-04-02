@@ -40,11 +40,14 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   // ==================== NEW: SCREEN SHARING STATES ====================
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
+  // ==================== NEW: REACTIONS STATES ====================
+  const [raisedHand, setRaisedHand] = useState(false);
+
   const myVideo = useRef<HTMLVideoElement>(null);
   const userVideo = useRef<HTMLVideoElement>(null);
   const connectionRef = useRef<any>(null);
   const currentPeerRef = useRef<any>(null);
-  const screenStreamRef = useRef<MediaStream | null>(null); // NEW
+  const screenStreamRef = useRef<MediaStream | null>(null);
 
   // ====================== GET USER MEDIA (run once) ======================
   useEffect(() => {
@@ -111,6 +114,12 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
 
     socket.on("codeUpdate", (newCode: string) => setCode(newCode));
 
+    // NEW: Listen for reactions from others
+    socket.on("reaction", (data: { type: string; emoji?: string; from: string }) => {
+      // This will be handled in VideoGrid for floating animation
+      window.dispatchEvent(new CustomEvent("receiveReaction", { detail: data }));
+    });
+
     socket.on("callEnded", () => leaveCall());
 
     return () => {
@@ -120,6 +129,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       socket.off("callAccepted");
       socket.off("messageReceived");
       socket.off("codeUpdate");
+      socket.off("reaction");
       socket.off("callEnded");
     };
   }, [me]);
@@ -207,12 +217,12 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       currentPeerRef.current = null;
     }
 
-    // NEW: Clean up screen sharing on leave
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach((track) => track.stop());
       screenStreamRef.current = null;
     }
     setIsScreenSharing(false);
+    setRaisedHand(false); // NEW
 
     setCallAccepted(false);
     setCallEnded(true);
@@ -250,15 +260,13 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
 
     try {
       if (!isScreenSharing) {
-        // Start Screen Sharing
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { cursor: "always" } as any, // FIXED: Added 'as any' to bypass Netlify build error
+          video: { cursor: "always" } as any,
           audio: false,
         });
 
         screenStreamRef.current = displayStream;
 
-        // Replace video track in the peer connection
         const videoSender = connectionRef.current._pc
           .getSenders()
           .find((sender: any) => sender.track?.kind === "video");
@@ -266,19 +274,15 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
         if (videoSender) {
           const screenTrack = displayStream.getVideoTracks()[0];
           await videoSender.replaceTrack(screenTrack);
-
-          // Disable camera track while sharing screen
           stream.getVideoTracks().forEach((track) => (track.enabled = false));
         }
 
         setIsScreenSharing(true);
 
-        // Auto stop when user clicks "Stop sharing" in browser UI
         displayStream.getVideoTracks()[0].onended = () => {
           stopScreenShare();
         };
       } else {
-        // Stop Screen Sharing
         stopScreenShare();
       }
     } catch (err: any) {
@@ -291,19 +295,16 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
     }
   }, [isScreenSharing, stream]);
 
-  // Helper function to stop screen sharing
   const stopScreenShare = useCallback(() => {
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach((track) => track.stop());
       screenStreamRef.current = null;
     }
 
-    // Re-enable camera
     if (stream) {
       stream.getVideoTracks().forEach((track) => (track.enabled = true));
     }
 
-    // Replace track back to camera
     if (connectionRef.current && stream) {
       const videoSender = connectionRef.current._pc
         .getSenders()
@@ -317,6 +318,30 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
 
     setIsScreenSharing(false);
   }, [stream]);
+
+  // ====================== NEW: REACTIONS FUNCTIONS ======================
+  const sendReaction = useCallback((emoji: string) => {
+    if (!roomId) return;
+    socket.emit("reaction", { 
+      type: "emoji", 
+      emoji, 
+      from: me,
+      roomId 
+    });
+  }, [roomId, me]);
+
+  const toggleRaiseHand = useCallback(() => {
+    const newState = !raisedHand;
+    setRaisedHand(newState);
+
+    if (!roomId) return;
+    socket.emit("reaction", { 
+      type: "raisehand", 
+      emoji: "✋", 
+      from: me,
+      roomId 
+    });
+  }, [raisedHand, roomId, me]);
 
   return (
     <SocketContext.Provider
@@ -358,9 +383,14 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
         isCameraOff,
         toggleCamera,
 
-        // ==================== NEW VALUES ====================
+        // Existing screen share
         isScreenSharing,
         toggleScreenShare,
+
+        // ==================== NEW REACTION VALUES ====================
+        raisedHand,
+        toggleRaiseHand,
+        sendReaction,
       }}
     >
       {children}
