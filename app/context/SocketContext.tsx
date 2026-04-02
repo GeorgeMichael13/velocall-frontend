@@ -70,7 +70,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
     });
 
     socket.on("user-joined", (newUserSocketId: string) => {
-      setTimeout(() => callUser(newUserSocketId), 1200); // slight delay helps
+      setTimeout(() => callUser(newUserSocketId), 1200);
     });
 
     socket.on("callUser", ({ from, signal }: any) => {
@@ -96,7 +96,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       socket.off("reaction");
       socket.off("callEnded");
     };
-  }, [me]);   // Only depend on me
+  }, [me]);
 
   // ====================== CALL USER ======================
   const callUser = useCallback((id: string) => {
@@ -190,7 +190,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
     }
   }, [stream, isCameraOff]);
 
-  // Screen Sharing (kept your logic)
+  // ====================== SCREEN SHARING (Fixed for Netlify) ======================
   const stopScreenShare = useCallback(() => {
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach(t => t.stop());
@@ -219,7 +219,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
         stopScreenShare();
       } else {
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { cursor: "always" },
+          video: { cursor: "always" } as any,   // Fixed TypeScript error
           audio: false,
         });
 
@@ -237,10 +237,13 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       }
     } catch (err: any) {
       console.error("Screen share error:", err);
-      if (err.name !== "NotAllowedError") alert("Failed to share screen");
+      if (err.name !== "NotAllowedError") {
+        alert("Failed to share screen");
+      }
     }
   }, [isScreenSharing, stream, stopScreenShare]);
 
+  // ====================== REACTIONS ======================
   const sendReaction = useCallback((emoji: string) => {
     if (!roomId) return;
     socket.emit("reaction", { type: "emoji", emoji, from: me, roomId });
