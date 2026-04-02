@@ -24,70 +24,68 @@ export default function VideoGrid() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<any[]>([]);
 
-  const isStreamAttached = useRef(false);
-  const hasPlayedLocal = useRef(false);
-  const hasPlayedRemote = useRef(false);
+  // Reduced refs - only one play attempt per video
+  const localVideoRef = useRef(false);
+  const remoteVideoRef = useRef(false);
 
-  // Safe play function
-  const safePlay = useCallback((videoEl: HTMLVideoElement | null, isRemote = false) => {
-    if (!videoEl) return;
+  const safePlay = useCallback((video: HTMLVideoElement | null, isRemote = false) => {
+    if (!video) return;
 
-    const playRef = isRemote ? hasPlayedRemote : hasPlayedLocal;
+    const playedRef = isRemote ? remoteVideoRef : localVideoRef;
 
-    if (videoEl.paused || videoEl.ended) {
-      videoEl.play().catch((err: any) => {
-        if (err.name !== "AbortError" && err.name !== "NotAllowedError") {
-          console.warn(`Video play failed (${isRemote ? 'remote' : 'local'}):`, err);
-        }
-      });
-      playRef.current = true;
-    }
+    if (playedRef.current) return; // Already attempted play
+
+    video.play().catch((err: any) => {
+      if (err.name !== "AbortError" && err.name !== "NotAllowedError") {
+        console.warn(`${isRemote ? "Remote" : "Local"} video play failed:`, err.name);
+      }
+    });
+
+    playedRef.current = true;
   }, []);
 
-  // Local Video Effect
+  // Local Stream Attachment
   useEffect(() => {
-    const videoElement = myVideo.current;
-    if (!videoElement || !stream) return;
+    const video = myVideo.current;
+    if (!video || !stream) return;
 
-    if (videoElement.srcObject !== stream) {
-      videoElement.srcObject = stream;
-      isStreamAttached.current = true;
-      hasPlayedLocal.current = false;
+    // Only set srcObject once when it changes
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+      localVideoRef.current = false; // Reset play flag when stream changes
     }
 
-    safePlay(videoElement, false);
-
-    return () => {
-      isStreamAttached.current = false;
-    };
+    safePlay(video, false);
   }, [stream, safePlay]);
 
-  // Camera Off Effect
+  // Remote Stream Attachment
   useEffect(() => {
-    const videoElement = myVideo.current;
-    if (!videoElement) return;
+    const video = userVideo.current;
+    if (!video) return;
+
+    safePlay(video, true);
+  }, [callAccepted, safePlay]);
+
+  // Camera Off Handling
+  useEffect(() => {
+    const video = myVideo.current;
+    if (!video) return;
 
     if (isCameraOff) {
-      videoElement.pause();
+      video.pause();
+      localVideoRef.current = false;
     } else {
-      safePlay(videoElement, false);
+      safePlay(video, false);
     }
   }, [isCameraOff, safePlay]);
-
-  // Remote Video Effect
-  useEffect(() => {
-    const videoElement = userVideo.current;
-    if (!videoElement) return;
-
-    safePlay(videoElement, true);
-  }, [callAccepted, safePlay]);
 
   // Floating Reactions
   useEffect(() => {
     const handleReaction = (e: any) => {
-      const { emoji } = e.detail;
-      const id = Date.now() + Math.random();
+      const { emoji } = e.detail || {};
+      if (!emoji) return;
 
+      const id = Date.now() + Math.random();
       setFloatingReactions(prev => [...prev, { id, emoji }]);
 
       setTimeout(() => {
@@ -120,14 +118,14 @@ export default function VideoGrid() {
       </header>
 
       {/* Floating Reactions */}
-      <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none z-40">
         {floatingReactions.map((reaction) => (
           <div
             key={reaction.id}
-            className="absolute text-6xl animate-float-up pointer-events-none"
+            className="absolute text-6xl animate-float-up"
             style={{
-              left: `${Math.random() * 70 + 15}%`,
-              bottom: "-60px",
+              left: `${Math.random() * 75 + 12.5}%`,
+              bottom: "-50px",
             }}
           >
             {reaction.emoji}
@@ -137,12 +135,10 @@ export default function VideoGrid() {
 
       <div className="flex-1 w-full h-full p-4 flex flex-col md:flex-row gap-4 items-center justify-center">
         {/* LOCAL FEED */}
-        <div
-          className={cn(
-            "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl transition-all duration-700 w-full aspect-video border border-white/5",
-            callAccepted && !callEnded ? "flex-1 md:max-w-[50%]" : "max-w-5xl",
-          )}
-        >
+        <div className={cn(
+          "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl transition-all duration-700 w-full aspect-video border border-white/5",
+          callAccepted && !callEnded ? "flex-1 md:max-w-[50%]" : "max-w-5xl"
+        )}>
           <video
             ref={myVideo}
             autoPlay
@@ -150,32 +146,24 @@ export default function VideoGrid() {
             muted
             className={cn(
               "w-full h-full object-cover transition-opacity duration-300",
-              isCameraOff ? "opacity-0" : "opacity-100",
+              isCameraOff ? "opacity-0" : "opacity-100"
             )}
-            style={{
-              transform: "scaleX(-1)",
-              WebkitTransform: "scaleX(-1)",
-            }}
+            style={{ transform: "scaleX(-1)", WebkitTransform: "scaleX(-1)" }}
           />
 
           {isCameraOff && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0D0D0D]">
-              <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
-                <VideoOff className="text-white/20 w-6 h-6" />
-              </div>
+            <div className="absolute inset-0 flex items-center justify-center bg-[#0D0D0D]">
+              <VideoOff className="text-white/20" size={48} />
             </div>
           )}
 
           <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider">
-              You
-            </span>
+            <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider">You</span>
           </div>
 
-          {/* Screen Sharing Indicator */}
           {isScreenSharing && (
-            <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2 z-10">
+            <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
               SCREEN SHARING
             </div>
@@ -186,7 +174,7 @@ export default function VideoGrid() {
             <button
               onClick={toggleScreenShare}
               className={cn(
-                "absolute bottom-4 right-20 px-4 py-2 rounded-2xl flex items-center gap-2 text-sm font-medium transition-all",
+                "absolute bottom-4 right-24 px-5 py-2.5 rounded-2xl text-sm font-medium transition-all",
                 isScreenSharing ? "bg-red-600 hover:bg-red-700" : "bg-white/10 hover:bg-white/20"
               )}
             >
@@ -198,47 +186,34 @@ export default function VideoGrid() {
           {callAccepted && !callEnded && (
             <button
               onClick={() => setShowOptions(!showOptions)}
-              className="absolute top-4 right-4 p-3 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-2xl transition-all z-20"
+              className="absolute top-4 right-4 p-3 bg-black/70 hover:bg-black/90 rounded-2xl transition-all"
             >
               <MoreVertical size={20} />
             </button>
           )}
 
-          {/* Options Menu */}
+          {/* Options & Emoji Picker - kept from previous */}
           {showOptions && callAccepted && !callEnded && (
-            <div className="absolute top-16 right-4 bg-[#111] border border-white/10 rounded-2xl p-2 shadow-xl z-50 w-56">
+            <div className="absolute top-16 right-4 bg-[#111] border border-white/10 rounded-2xl p-2 w-56 shadow-2xl z-50">
               <button
-                onClick={() => {
-                  toggleRaiseHand();
-                  setShowOptions(false);
-                }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl transition-all",
-                  raisedHand && "text-yellow-400"
-                )}
+                onClick={() => { toggleRaiseHand(); setShowOptions(false); }}
+                className={cn("w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl", raisedHand && "text-yellow-400")}
               >
-                <Hand size={20} />
-                <span>{raisedHand ? "Lower Hand" : "Raise Hand"}</span>
+                <Hand size={20} /> {raisedHand ? "Lower Hand" : "Raise Hand"}
               </button>
-
               <button
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl transition-all"
+                onClick={() => setShowEmojiPicker(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl"
               >
                 😊 React
               </button>
             </div>
           )}
 
-          {/* Emoji Picker */}
           {showEmojiPicker && (
-            <div className="absolute top-16 right-4 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-xl z-50 flex gap-3">
-              {commonEmojis.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => handleEmojiClick(emoji)}
-                  className="text-4xl hover:scale-125 active:scale-110 transition-transform p-2"
-                >
+            <div className="absolute top-16 right-4 bg-[#111] border border-white/10 rounded-2xl p-4 flex gap-4 z-50">
+              {commonEmojis.map(emoji => (
+                <button key={emoji} onClick={() => handleEmojiClick(emoji)} className="text-5xl hover:scale-125 transition-transform">
                   {emoji}
                 </button>
               ))}
@@ -255,15 +230,12 @@ export default function VideoGrid() {
               playsInline
               className="w-full h-full object-cover"
             />
-            <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
-              <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider">
-                Remote Peer
-              </span>
+            <div className="absolute bottom-4 left-4 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
+              <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider">Remote Peer</span>
             </div>
           </div>
         ) : (
           <div className="relative bg-white/[0.02] border border-dashed border-white/10 rounded-3xl flex-1 md:max-w-[50%] aspect-video flex flex-col items-center justify-center gap-4">
-            {/* Waiting UI - unchanged */}
             <div className="relative">
               <div className="absolute inset-0 bg-red-500/20 blur-2xl rounded-full animate-pulse" />
               <div className="relative w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -272,12 +244,8 @@ export default function VideoGrid() {
               <LoaderCircle className="absolute -top-1 -right-1 text-red-500 w-5 h-5 animate-spin" />
             </div>
             <div className="text-center space-y-1">
-              <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em]">
-                Waiting for others to join
-              </p>
-              <p className="text-white/10 text-[9px]">
-                Share your meeting link to start the conversation
-              </p>
+              <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em]">Waiting for others to join</p>
+              <p className="text-white/10 text-[9px]">Share your meeting link</p>
             </div>
           </div>
         )}
@@ -285,15 +253,12 @@ export default function VideoGrid() {
 
       <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
 
-      {/* Floating Animation */}
       <style jsx>{`
         @keyframes float-up {
-          0% { opacity: 1; transform: translateY(0) scale(0.8); }
-          100% { opacity: 0; transform: translateY(-650px) scale(1.3); }
+          0% { opacity: 1; transform: translateY(0) scale(0.7); }
+          100% { opacity: 0; transform: translateY(-700px) scale(1.4); }
         }
-        .animate-float-up {
-          animation: float-up 2.8s ease-out forwards;
-        }
+        .animate-float-up { animation: float-up 2.8s ease-out forwards; }
       `}</style>
     </div>
   );
