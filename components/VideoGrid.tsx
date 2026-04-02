@@ -15,7 +15,6 @@ export default function VideoGrid() {
     stream,
     isScreenSharing,
     toggleScreenShare,
-    // NEW: Reaction features
     raisedHand,
     toggleRaiseHand,
     sendReaction 
@@ -26,18 +25,26 @@ export default function VideoGrid() {
   const [floatingReactions, setFloatingReactions] = useState<any[]>([]);
 
   const isStreamAttached = useRef(false);
-  const hasPlayed = useRef(false);
+  const hasPlayedLocal = useRef(false);
+  const hasPlayedRemote = useRef(false);
 
-  const playVideo = useCallback((videoEl: HTMLVideoElement) => {
+  // Safe play function
+  const safePlay = useCallback((videoEl: HTMLVideoElement | null, isRemote = false) => {
+    if (!videoEl) return;
+
+    const playRef = isRemote ? hasPlayedRemote : hasPlayedLocal;
+
     if (videoEl.paused || videoEl.ended) {
       videoEl.play().catch((err: any) => {
         if (err.name !== "AbortError" && err.name !== "NotAllowedError") {
-          console.warn("Video play failed:", err);
+          console.warn(`Video play failed (${isRemote ? 'remote' : 'local'}):`, err);
         }
       });
+      playRef.current = true;
     }
   }, []);
 
+  // Local Video Effect
   useEffect(() => {
     const videoElement = myVideo.current;
     if (!videoElement || !stream) return;
@@ -45,42 +52,47 @@ export default function VideoGrid() {
     if (videoElement.srcObject !== stream) {
       videoElement.srcObject = stream;
       isStreamAttached.current = true;
-      hasPlayed.current = false;
+      hasPlayedLocal.current = false;
     }
 
-    if (!hasPlayed.current) {
-      playVideo(videoElement);
-      hasPlayed.current = true;
-    }
+    safePlay(videoElement, false);
 
     return () => {
       isStreamAttached.current = false;
     };
-  }, [stream, playVideo]);
+  }, [stream, safePlay]);
 
+  // Camera Off Effect
   useEffect(() => {
     const videoElement = myVideo.current;
     if (!videoElement) return;
 
     if (isCameraOff) {
       videoElement.pause();
-    } else if (stream) {
-      playVideo(videoElement);
+    } else {
+      safePlay(videoElement, false);
     }
-  }, [isCameraOff, stream, playVideo]);
+  }, [isCameraOff, safePlay]);
 
-  // ====================== NEW: FLOATING REACTIONS ======================
+  // Remote Video Effect
+  useEffect(() => {
+    const videoElement = userVideo.current;
+    if (!videoElement) return;
+
+    safePlay(videoElement, true);
+  }, [callAccepted, safePlay]);
+
+  // Floating Reactions
   useEffect(() => {
     const handleReaction = (e: any) => {
-      const { type, emoji } = e.detail;
+      const { emoji } = e.detail;
       const id = Date.now() + Math.random();
 
-      setFloatingReactions(prev => [...prev, { id, emoji, type }]);
+      setFloatingReactions(prev => [...prev, { id, emoji }]);
 
-      // Auto remove after animation
       setTimeout(() => {
         setFloatingReactions(prev => prev.filter(r => r.id !== id));
-      }, 3000);
+      }, 2800);
     };
 
     window.addEventListener("receiveReaction", handleReaction);
@@ -107,16 +119,15 @@ export default function VideoGrid() {
         </div>
       </header>
 
-      {/* Floating Reactions Container */}
+      {/* Floating Reactions */}
       <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
         {floatingReactions.map((reaction) => (
           <div
             key={reaction.id}
             className="absolute text-6xl animate-float-up pointer-events-none"
             style={{
-              left: `${Math.random() * 80 + 10}%`,
-              bottom: "-50px",
-              animationDuration: "2.8s",
+              left: `${Math.random() * 70 + 15}%`,
+              bottom: "-60px",
             }}
           >
             {reaction.emoji}
@@ -162,26 +173,32 @@ export default function VideoGrid() {
             </span>
           </div>
 
+          {/* Screen Sharing Indicator */}
+          {isScreenSharing && (
+            <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2 z-10">
+              <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+              SCREEN SHARING
+            </div>
+          )}
+
           {/* Share Screen Button */}
           {callAccepted && !callEnded && (
             <button
               onClick={toggleScreenShare}
               className={cn(
-                "absolute bottom-4 right-4 px-4 py-2 rounded-2xl flex items-center gap-2 text-sm font-medium transition-all",
-                isScreenSharing
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-white/10 hover:bg-white/20"
+                "absolute bottom-4 right-20 px-4 py-2 rounded-2xl flex items-center gap-2 text-sm font-medium transition-all",
+                isScreenSharing ? "bg-red-600 hover:bg-red-700" : "bg-white/10 hover:bg-white/20"
               )}
             >
-              {isScreenSharing ? <>Stop Sharing</> : <>Share Screen</>}
+              {isScreenSharing ? "Stop Sharing" : "Share Screen"}
             </button>
           )}
 
-          {/* NEW: Options Button (⋯) */}
+          {/* Options Button */}
           {callAccepted && !callEnded && (
             <button
               onClick={() => setShowOptions(!showOptions)}
-              className="absolute top-4 right-4 p-3 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-2xl transition-all"
+              className="absolute top-4 right-4 p-3 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-2xl transition-all z-20"
             >
               <MoreVertical size={20} />
             </button>
@@ -205,10 +222,7 @@ export default function VideoGrid() {
               </button>
 
               <button
-                onClick={() => {
-                  setShowEmojiPicker(!showEmojiPicker);
-                  setShowOptions(false);
-                }}
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl transition-all"
               >
                 😊 React
@@ -218,12 +232,12 @@ export default function VideoGrid() {
 
           {/* Emoji Picker */}
           {showEmojiPicker && (
-            <div className="absolute top-16 right-4 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-xl z-50 flex gap-2">
+            <div className="absolute top-16 right-4 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-xl z-50 flex gap-3">
               {commonEmojis.map((emoji) => (
                 <button
                   key={emoji}
                   onClick={() => handleEmojiClick(emoji)}
-                  className="text-4xl hover:scale-125 transition-transform p-2"
+                  className="text-4xl hover:scale-125 active:scale-110 transition-transform p-2"
                 >
                   {emoji}
                 </button>
@@ -232,9 +246,9 @@ export default function VideoGrid() {
           )}
         </div>
 
-        {/* REMOTE FEED - unchanged */}
+        {/* REMOTE FEED */}
         {callAccepted && !callEnded ? (
-          <div className="relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl flex-1 md:max-w-[50%] aspect-video border border-white/5 animate-in fade-in zoom-in-95 duration-700">
+          <div className="relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl flex-1 md:max-w-[50%] aspect-video border border-white/5">
             <video
               ref={userVideo}
               autoPlay
@@ -248,11 +262,8 @@ export default function VideoGrid() {
             </div>
           </div>
         ) : (
-          <div
-            className={cn(
-              "relative bg-white/[0.02] border border-dashed border-white/10 rounded-3xl flex-1 md:max-w-[50%] aspect-video flex flex-col items-center justify-center gap-4 transition-all duration-1000",
-            )}
-          >
+          <div className="relative bg-white/[0.02] border border-dashed border-white/10 rounded-3xl flex-1 md:max-w-[50%] aspect-video flex flex-col items-center justify-center gap-4">
+            {/* Waiting UI - unchanged */}
             <div className="relative">
               <div className="absolute inset-0 bg-red-500/20 blur-2xl rounded-full animate-pulse" />
               <div className="relative w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -274,20 +285,14 @@ export default function VideoGrid() {
 
       <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
 
-      {/* Add this CSS for floating animation (you can put it in globals.css) */}
+      {/* Floating Animation */}
       <style jsx>{`
         @keyframes float-up {
-          0% {
-            opacity: 1;
-            transform: translateY(0) scale(0.6);
-          }
-          100% {
-            opacity: 0;
-            transform: translateY(-600px) scale(1.2);
-          }
+          0% { opacity: 1; transform: translateY(0) scale(0.8); }
+          100% { opacity: 0; transform: translateY(-650px) scale(1.3); }
         }
         .animate-float-up {
-          animation: float-up 3s ease-out forwards;
+          animation: float-up 2.8s ease-out forwards;
         }
       `}</style>
     </div>
