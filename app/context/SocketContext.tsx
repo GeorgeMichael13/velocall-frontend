@@ -18,7 +18,6 @@ const socket: Socket = io("https://velocall-backend.onrender.com");
 const iceServers = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:stun2.l.google.com:19302" },
 ];
 
 export const ContextProvider = ({ children }: { children: React.ReactNode }) => {
@@ -33,11 +32,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   const [code, setCode] = useState("// Real-time collaborative editor...");
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
-
-  // Screen Sharing
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-
-  // Reactions
   const [raisedHand, setRaisedHand] = useState(false);
 
   const myVideo = useRef<HTMLVideoElement>(null);
@@ -56,10 +51,9 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
         setStream(currentStream);
         if (myVideo.current) {
           myVideo.current.srcObject = currentStream;
-          myVideo.current.play().catch(console.warn);
         }
       })
-      .catch((err) => console.error("Failed to get media stream:", err));
+      .catch((err) => console.error("Media error:", err));
 
     return () => { isMounted = false; };
   }, []);
@@ -68,8 +62,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   useEffect(() => {
     socket.on("me", (id: string) => {
       setMe(id);
-      const urlParams = new URLSearchParams(window.location.search);
-      const rId = urlParams.get("id");
+      const rId = new URLSearchParams(window.location.search).get("id");
       if (rId) {
         setRoomId(rId);
         socket.emit("join-room", rId);
@@ -77,10 +70,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
     });
 
     socket.on("user-joined", (newUserSocketId: string) => {
-      // CRITICAL: Re-added timeout. Without this, the handshake fails 90% of the time on mobile/slow networks.
-      setTimeout(() => {
-        callUser(newUserSocketId);
-      }, 1000);
+      setTimeout(() => callUser(newUserSocketId), 1200); // slight delay helps
     });
 
     socket.on("callUser", ({ from, signal }: any) => {
@@ -89,19 +79,8 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
 
     socket.on("callAccepted", (signal: any) => {
       setCallAccepted(true);
-      if (connectionRef.current) {
-        connectionRef.current.signal(signal);
-      }
+      if (connectionRef.current) connectionRef.current.signal(signal);
     });
-
-    socket.on("messageReceived", (msg: any) => {
-      setMessages((prev) => [
-        ...prev,
-        { ...msg, time: new Date().toLocaleTimeString(), isLocal: msg.from === me },
-      ]);
-    });
-
-    socket.on("codeUpdate", (newCode: string) => setCode(newCode));
 
     socket.on("reaction", (data: any) => {
       window.dispatchEvent(new CustomEvent("receiveReaction", { detail: data }));
@@ -114,12 +93,10 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       socket.off("user-joined");
       socket.off("callUser");
       socket.off("callAccepted");
-      socket.off("messageReceived");
-      socket.off("codeUpdate");
       socket.off("reaction");
       socket.off("callEnded");
     };
-  }, [me, stream]); // Added stream as dependency
+  }, [me]);   // Only depend on me
 
   // ====================== CALL USER ======================
   const callUser = useCallback((id: string) => {
@@ -134,22 +111,15 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
 
     setOtherUser(id);
 
-    peer.on("signal", (data: any) => {
-      socket.emit("callUser", {
-        userToCall: id,
-        signalData: data,
-        from: me,
-        name,
-      });
+    peer.on("signal", (data) => {
+      socket.emit("callUser", { userToCall: id, signalData: data, from: me, name });
     });
 
-    peer.on("stream", (remoteStream: MediaStream) => {
-      if (userVideo.current) {
-        userVideo.current.srcObject = remoteStream;
-      }
+    peer.on("stream", (remoteStream) => {
+      if (userVideo.current) userVideo.current.srcObject = remoteStream;
     });
 
-    peer.on("error", (err: any) => console.error("Peer error:", err));
+    peer.on("error", (err) => console.error("Peer error:", err));
 
     connectionRef.current = peer;
   }, [stream, me, name]);
@@ -168,17 +138,13 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       config: { iceServers },
     });
 
-    peer.on("signal", (data: any) => {
+    peer.on("signal", (data) => {
       socket.emit("answerCall", { signal: data, to: from });
     });
 
-    peer.on("stream", (remoteStream: MediaStream) => {
-      if (userVideo.current) {
-        userVideo.current.srcObject = remoteStream;
-      }
+    peer.on("stream", (remoteStream) => {
+      if (userVideo.current) userVideo.current.srcObject = remoteStream;
     });
-
-    peer.on("error", (err: any) => console.error("Peer error:", err));
 
     peer.signal(signal);
     connectionRef.current = peer;
@@ -188,104 +154,93 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   const leaveCall = useCallback(() => {
     socket.emit("leaveCall", { to: otherUser });
 
-    if (stream) stream.getTracks().forEach((track) => track.stop());
-    if (screenStreamRef.current) screenStreamRef.current.getTracks().forEach((track) => track.stop());
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    if (screenStreamRef.current) screenStreamRef.current.getTracks().forEach(t => t.stop());
 
     if (connectionRef.current) {
       connectionRef.current.destroy();
       connectionRef.current = null;
     }
 
-    screenStreamRef.current = null;
     setIsScreenSharing(false);
     setRaisedHand(false);
     setCallAccepted(false);
     setCallEnded(true);
     setOtherUser("");
-    window.location.reload(); // Hard reset to ensure media is released
   }, [stream, otherUser]);
 
-  // ====================== TOGGLE MUTE / CAMERA ======================
+  // ====================== CONTROLS ======================
   const toggleMute = useCallback(() => {
     if (!stream) return;
-    const audioTrack = stream.getAudioTracks()[0];
-    if (audioTrack) {
-      const newMuted = !isMuted;
-      audioTrack.enabled = !newMuted;
-      setIsMuted(newMuted);
+    const track = stream.getAudioTracks()[0];
+    if (track) {
+      const newState = !isMuted;
+      track.enabled = !newState;
+      setIsMuted(newState);
     }
   }, [stream, isMuted]);
 
   const toggleCamera = useCallback(() => {
     if (!stream) return;
-    const videoTrack = stream.getVideoTracks()[0];
-    if (videoTrack) {
+    const track = stream.getVideoTracks()[0];
+    if (track) {
       const newState = !isCameraOff;
-      videoTrack.enabled = !newState;
+      track.enabled = !newState;
       setIsCameraOff(newState);
     }
   }, [stream, isCameraOff]);
 
-  // ====================== SCREEN SHARING ======================
+  // Screen Sharing (kept your logic)
   const stopScreenShare = useCallback(() => {
     if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach((track) => track.stop());
+      screenStreamRef.current.getTracks().forEach(t => t.stop());
       screenStreamRef.current = null;
     }
-
-    if (stream) {
-      stream.getVideoTracks().forEach((track) => (track.enabled = true));
-    }
+    if (stream) stream.getVideoTracks().forEach(t => t.enabled = true);
 
     if (connectionRef.current && stream) {
-      const videoSender = connectionRef.current._pc
-        .getSenders()
-        .find((sender: any) => sender.track?.kind === "video");
-
-      if (videoSender) {
+      const sender = connectionRef.current._pc.getSenders().find((s: any) => s.track?.kind === "video");
+      if (sender) {
         const cameraTrack = stream.getVideoTracks()[0];
-        if (cameraTrack) videoSender.replaceTrack(cameraTrack);
+        if (cameraTrack) sender.replaceTrack(cameraTrack);
       }
     }
     setIsScreenSharing(false);
   }, [stream]);
 
   const toggleScreenShare = useCallback(async () => {
-    if (!connectionRef.current || !stream) {
-      alert("Wait for the connection to establish before sharing.");
+    if (!connectionRef.current) {
+      alert("Please wait for the other person to join before sharing screen.");
       return;
     }
 
     try {
-      if (!isScreenSharing) {
+      if (isScreenSharing) {
+        stopScreenShare();
+      } else {
         const displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { cursor: "always" } as any,
+          video: { cursor: "always" },
           audio: false,
         });
 
         screenStreamRef.current = displayStream;
 
-        const videoSender = connectionRef.current._pc
-          .getSenders()
-          .find((sender: any) => sender.track?.kind === "video");
-
-        if (videoSender) {
-          const screenTrack = displayStream.getVideoTracks()[0];
-          await videoSender.replaceTrack(screenTrack);
-          stream.getVideoTracks().forEach((track) => (track.enabled = false));
+        const sender = connectionRef.current._pc.getSenders().find((s: any) => s.track?.kind === "video");
+        if (sender) {
+          await sender.replaceTrack(displayStream.getVideoTracks()[0]);
+          stream?.getVideoTracks().forEach(t => t.enabled = false);
         }
 
         setIsScreenSharing(true);
-        displayStream.getVideoTracks()[0].onended = () => stopScreenShare();
-      } else {
-        stopScreenShare();
+
+        displayStream.getVideoTracks()[0].onended = stopScreenShare;
       }
     } catch (err: any) {
       console.error("Screen share error:", err);
+      if (err.name !== "NotAllowedError") alert("Failed to share screen");
     }
   }, [isScreenSharing, stream, stopScreenShare]);
 
-  // ====================== REACTIONS ======================
   const sendReaction = useCallback((emoji: string) => {
     if (!roomId) return;
     socket.emit("reaction", { type: "emoji", emoji, from: me, roomId });
@@ -294,8 +249,9 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   const toggleRaiseHand = useCallback(() => {
     const newState = !raisedHand;
     setRaisedHand(newState);
-    if (!roomId) return;
-    socket.emit("reaction", { type: "raisehand", emoji: "✋", from: me, roomId });
+    if (roomId) {
+      socket.emit("reaction", { type: "raisehand", emoji: "✋", from: me, roomId });
+    }
   }, [raisedHand, roomId, me]);
 
   return (
@@ -319,9 +275,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
           window.history.replaceState({}, "", `?id=${rId}`);
         },
         messages,
-        sendMessage: (text: string) => {
-          socket.emit("sendMessage", { text, from: me, name: name || "Anonymous", roomId });
-        },
+        sendMessage: (text: string) => socket.emit("sendMessage", { text, from: me, name: name || "Anonymous", roomId }),
         code,
         updateCode: (newCode: string) => {
           setCode(newCode);

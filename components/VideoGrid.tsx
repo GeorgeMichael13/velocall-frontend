@@ -24,56 +24,62 @@ export default function VideoGrid() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<any[]>([]);
 
-  // Reduced refs - only one play attempt per video
-  const localVideoRef = useRef(false);
-  const remoteVideoRef = useRef(false);
+  // Refs to prevent spamming .play()
+  const localPlayAttempted = useRef(false);
+  const remotePlayAttempted = useRef(false);
 
-  const safePlay = useCallback((video: HTMLVideoElement | null, isRemote = false) => {
-    if (!video) return;
+  const safePlay = useCallback((videoEl: HTMLVideoElement | null, isRemote = false) => {
+    if (!videoEl) return;
 
-    const playedRef = isRemote ? remoteVideoRef : localVideoRef;
+    const attemptedRef = isRemote ? remotePlayAttempted : localPlayAttempted;
 
-    if (playedRef.current) return; // Already attempted play
+    // Only attempt play if not already attempted or if video is paused
+    if (attemptedRef.current && !videoEl.paused) return;
 
-    video.play().catch((err: any) => {
+    videoEl.play().catch((err: any) => {
+      // Only log real errors, ignore AbortError which is common during stream changes
       if (err.name !== "AbortError" && err.name !== "NotAllowedError") {
-        console.warn(`${isRemote ? "Remote" : "Local"} video play failed:`, err.name);
+        console.warn(`${isRemote ? "Remote" : "Local"} play error:`, err.name);
       }
     });
 
-    playedRef.current = true;
+    attemptedRef.current = true;
   }, []);
 
-  // Local Stream Attachment
+  // Local Video
   useEffect(() => {
     const video = myVideo.current;
     if (!video || !stream) return;
 
-    // Only set srcObject once when it changes
     if (video.srcObject !== stream) {
       video.srcObject = stream;
-      localVideoRef.current = false; // Reset play flag when stream changes
+      localPlayAttempted.current = false;   // Reset when stream changes
     }
 
     safePlay(video, false);
   }, [stream, safePlay]);
 
-  // Remote Stream Attachment
+  // Remote Video
   useEffect(() => {
     const video = userVideo.current;
     if (!video) return;
 
+    // Reset play flag when call becomes active
+    if (callAccepted) {
+      remotePlayAttempted.current = false;
+    }
+
     safePlay(video, true);
   }, [callAccepted, safePlay]);
 
-  // Camera Off Handling
+  // Camera Toggle
   useEffect(() => {
     const video = myVideo.current;
     if (!video) return;
 
     if (isCameraOff) {
       video.pause();
-      localVideoRef.current = false;
+      localPlayAttempted.current = false;
     } else {
       safePlay(video, false);
     }
@@ -118,7 +124,7 @@ export default function VideoGrid() {
       </header>
 
       {/* Floating Reactions */}
-      <div className="absolute inset-0 pointer-events-none z-40">
+      <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
         {floatingReactions.map((reaction) => (
           <div
             key={reaction.id}
@@ -163,7 +169,7 @@ export default function VideoGrid() {
           </div>
 
           {isScreenSharing && (
-            <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2">
+            <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2 z-10">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
               SCREEN SHARING
             </div>
@@ -186,13 +192,13 @@ export default function VideoGrid() {
           {callAccepted && !callEnded && (
             <button
               onClick={() => setShowOptions(!showOptions)}
-              className="absolute top-4 right-4 p-3 bg-black/70 hover:bg-black/90 rounded-2xl transition-all"
+              className="absolute top-4 right-4 p-3 bg-black/70 hover:bg-black/90 rounded-2xl transition-all z-20"
             >
               <MoreVertical size={20} />
             </button>
           )}
 
-          {/* Options & Emoji Picker - kept from previous */}
+          {/* Options Menu */}
           {showOptions && callAccepted && !callEnded && (
             <div className="absolute top-16 right-4 bg-[#111] border border-white/10 rounded-2xl p-2 w-56 shadow-2xl z-50">
               <button
@@ -210,10 +216,15 @@ export default function VideoGrid() {
             </div>
           )}
 
+          {/* Emoji Picker */}
           {showEmojiPicker && (
             <div className="absolute top-16 right-4 bg-[#111] border border-white/10 rounded-2xl p-4 flex gap-4 z-50">
               {commonEmojis.map(emoji => (
-                <button key={emoji} onClick={() => handleEmojiClick(emoji)} className="text-5xl hover:scale-125 transition-transform">
+                <button 
+                  key={emoji} 
+                  onClick={() => handleEmojiClick(emoji)} 
+                  className="text-5xl hover:scale-125 active:scale-110 transition-transform p-2"
+                >
                   {emoji}
                 </button>
               ))}
