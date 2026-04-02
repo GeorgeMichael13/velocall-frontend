@@ -6,8 +6,17 @@ import { useSocket } from "@/app/context/SocketContext";
 import { cn } from "@/lib/utils";
 
 export default function VideoGrid() {
-  const { myVideo, userVideo, callAccepted, callEnded, isCameraOff, stream } =
-    useSocket();
+  const { 
+    myVideo, 
+    userVideo, 
+    callAccepted, 
+    callEnded, 
+    isCameraOff, 
+    stream,
+    // NEW: Added for screen sharing
+    isScreenSharing,
+    toggleScreenShare 
+  } = useSocket();
 
   const isStreamAttached = useRef(false);
   const hasPlayed = useRef(false);
@@ -42,7 +51,6 @@ export default function VideoGrid() {
     }
 
     return () => {
-      // Optional: don't fully stop tracks here unless you own the stream cleanup
       isStreamAttached.current = false;
     };
   }, [stream, playVideo]);
@@ -88,9 +96,8 @@ export default function VideoGrid() {
               "w-full h-full object-cover transition-opacity duration-300",
               isCameraOff ? "opacity-0" : "opacity-100",
             )}
-            // ← This is the key fix: mirror the local preview (natural selfie)
             style={{
-              transform: "scaleX(-1)",        // Mirror horizontally
+              transform: "scaleX(-1)",
               WebkitTransform: "scaleX(-1)",
             }}
           />
@@ -103,12 +110,32 @@ export default function VideoGrid() {
             </div>
           )}
 
+          {/* Your existing "You" label */}
           <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider">
               You
             </span>
           </div>
+
+          {/* NEW: Share Screen Button - Added exactly as you requested */}
+          {callAccepted && !callEnded && (
+            <button
+              onClick={toggleScreenShare}
+              className={cn(
+                "absolute bottom-4 right-4 px-4 py-2 rounded-2xl flex items-center gap-2 text-sm font-medium transition-all",
+                isScreenSharing
+                  ? "bg-red-600 hover:bg-red-700"
+                  : "bg-white/10 hover:bg-white/20"
+              )}
+            >
+              {isScreenSharing ? (
+                <>Stop Sharing</>
+              ) : (
+                <>Share Screen</>
+              )}
+            </button>
+          )}
         </div>
 
         {/* REMOTE FEED - NO mirroring (others should see you naturally) */}
@@ -119,7 +146,6 @@ export default function VideoGrid() {
               autoPlay
               playsInline
               className="w-full h-full object-cover"
-              // No scaleX(-1) here — remote should not be mirrored
             />
             <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
               <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider">

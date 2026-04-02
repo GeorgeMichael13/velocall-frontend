@@ -9,7 +9,7 @@ import React, {
   useContext,
 } from "react";
 import { io, Socket } from "socket.io-client";
-import Peer from "simple-peer"; // Import directly (better than dynamic import in most cases)
+import Peer from "simple-peer";
 
 const SocketContext = createContext<any>(null);
 
@@ -37,10 +37,14 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
 
+  // ==================== NEW: SCREEN SHARING STATES ====================
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+
   const myVideo = useRef<HTMLVideoElement>(null);
   const userVideo = useRef<HTMLVideoElement>(null);
   const connectionRef = useRef<any>(null);
-  const currentPeerRef = useRef<any>(null); // Better tracking
+  const currentPeerRef = useRef<any>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null); // NEW
 
   // ====================== GET USER MEDIA (run once) ======================
   useEffect(() => {
@@ -55,7 +59,6 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
         }
         setStream(currentStream);
 
-        // Attach to local video (mirror handled in VideoGrid component)
         if (myVideo.current) {
           myVideo.current.srcObject = currentStream;
           myVideo.current.play().catch(console.warn);
@@ -68,7 +71,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
     return () => {
       isMounted = false;
     };
-  }, []); // ← Empty dependency: run only once
+  }, []);
 
   // ====================== SOCKET SETUP ======================
   useEffect(() => {
@@ -84,7 +87,6 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
     });
 
     socket.on("user-joined", (newUserSocketId: string) => {
-      // Small delay to ensure stream is ready
       setTimeout(() => callUser(newUserSocketId), 800);
     });
 
@@ -120,7 +122,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       socket.off("codeUpdate");
       socket.off("callEnded");
     };
-  }, [me]); // me is safe here
+  }, [me]);
 
   // ====================== ANSWER INCOMING CALL ======================
   const answerCall = useCallback(() => {
@@ -153,12 +155,9 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
     currentPeerRef.current = peer;
   }, [stream, call]);
 
-  // Call this from your UI when user accepts the call
-  // Example: <button onClick={answerCall}>Accept Call</button>
-
   // ====================== CALL USER ======================
   const callUser = useCallback((id: string) => {
-    if (!stream || !Peer) return; // Peer is now imported directly
+    if (!stream || !Peer) return;
 
     const peer = new Peer({
       initiator: true,
@@ -208,16 +207,20 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       currentPeerRef.current = null;
     }
 
+    // NEW: Clean up screen sharing on leave
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((track) => track.stop());
+      screenStreamRef.current = null;
+    }
+    setIsScreenSharing(false);
+
     setCallAccepted(false);
     setCallEnded(true);
     setCall({});
     setOtherUser("");
-
-    // Optional: reload to clean everything
-    // window.location.assign(window.location.origin);
   }, [stream, otherUser]);
 
-  // ====================== TOGGLE MUTE / CAMERA (Improved) ======================
+  // ====================== TOGGLE MUTE / CAMERA ======================
   const toggleMute = useCallback(() => {
     if (!stream) return;
     const audioTrack = stream.getAudioTracks()[0];
@@ -238,9 +241,82 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
     }
   }, [stream, isCameraOff]);
 
-  // Note: For real camera switching (front ↔ back), you need to stop old tracks,
-  // get a new stream with facingMode, then replaceTrack on the peer.
-  // That's more advanced — let me know if you need it.
+  // ====================== NEW: TOGGLE SCREEN SHARE ======================
+  const toggleScreenShare = useCallback(async () => {
+    if (!connectionRef.current || !stream) {
+      console.warn("No active peer connection or stream");
+      return;
+    }
+
+    try {
+      if (!isScreenSharing) {
+        // Start Screen Sharing
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { cursor: "always" },
+          audio: false,
+        });
+
+        screenStreamRef.current = displayStream;
+
+        // Replace video track in the peer connection
+        const videoSender = connectionRef.current._pc
+          .getSenders()
+          .find((sender: any) => sender.track?.kind === "video");
+
+        if (videoSender) {
+          const screenTrack = displayStream.getVideoTracks()[0];
+          await videoSender.replaceTrack(screenTrack);
+
+          // Disable camera track while sharing screen
+          stream.getVideoTracks().forEach((track) => (track.enabled = false));
+        }
+
+        setIsScreenSharing(true);
+
+        // Auto stop when user clicks "Stop sharing" in browser UI
+        displayStream.getVideoTracks()[0].onended = () => {
+          stopScreenShare();
+        };
+      } else {
+        // Stop Screen Sharing
+        stopScreenShare();
+      }
+    } catch (err: any) {
+      console.error("Screen share error:", err);
+      if (err.name === "NotAllowedError") {
+        alert("Screen sharing was cancelled or permission denied.");
+      } else {
+        alert("Failed to share screen. Please try again.");
+      }
+    }
+  }, [isScreenSharing, stream]);
+
+  // Helper function to stop screen sharing
+  const stopScreenShare = useCallback(() => {
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((track) => track.stop());
+      screenStreamRef.current = null;
+    }
+
+    // Re-enable camera
+    if (stream) {
+      stream.getVideoTracks().forEach((track) => (track.enabled = true));
+    }
+
+    // Replace track back to camera
+    if (connectionRef.current && stream) {
+      const videoSender = connectionRef.current._pc
+        .getSenders()
+        .find((sender: any) => sender.track?.kind === "video");
+
+      if (videoSender) {
+        const cameraTrack = stream.getVideoTracks()[0];
+        if (cameraTrack) videoSender.replaceTrack(cameraTrack);
+      }
+    }
+
+    setIsScreenSharing(false);
+  }, [stream]);
 
   return (
     <SocketContext.Provider
@@ -255,7 +331,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
         callEnded,
         me,
         callUser,
-        answerCall,        // ← Added: important!
+        answerCall,
         leaveCall,
         createNewRoom: () => {
           const rId = Math.random().toString(36).substring(2, 10);
@@ -281,6 +357,10 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
         toggleMute,
         isCameraOff,
         toggleCamera,
+
+        // ==================== NEW VALUES ====================
+        isScreenSharing,
+        toggleScreenShare,
       }}
     >
       {children}
