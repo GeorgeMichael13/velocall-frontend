@@ -1,95 +1,66 @@
 const express = require("express");
 const http = require("http");
+const { AccessToken } = require("livekit-server-sdk");
+
 const app = express();
 const server = http.createServer(app);
 
-// Updated CORS for deployment flexibility
-const io = require("socket.io")(server, {
-  cors: {
-    origin: "*", // For Render/Netlify, you can refine this to your Netlify URL later
-    methods: ["GET", "POST"]
-  }
+app.use(express.json());
+
+// CORS
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
 });
 
 const PORT = process.env.PORT || 5000;
 
 app.get("/", (req, res) => {
-  res.send("VeloCall Server is running perfectly.");
+  res.send("VeloCall LiveKit Server is running.");
 });
 
-// Health check for Render's monitoring
 app.get("/health", (req, res) => {
   res.status(200).send("Server is healthy.");
 });
 
-const activeMeetings = new Set();
+// ====================== LIVEKIT TOKEN GENERATOR ======================
+app.post("/api/livekit-token", (req, res) => {
+  const { room, identity } = req.body;
 
-io.on("connection", (socket) => {
-  console.log(`[Connected]: ${socket.id}`);
-  socket.emit("me", socket.id);
+  if (!room || !identity) {
+    return res.status(400).json({ error: "room and identity are required" });
+  }
 
-  // --- GOOGLE MEET STYLE ROOM LOGIC ---
-  socket.on("join-room", (roomId) => {
-    socket.join(roomId);
-    activeMeetings.add(roomId);
-    console.log(`[User Joined Room]: ${socket.id} -> Room: ${roomId}`);
-    
-    // Notify others in the room
-    socket.to(roomId).emit("user-joined", socket.id);
-  });
+  try {
+    const at = new AccessToken(
+      process.env.LIVEKIT_API_KEY,
+      process.env.LIVEKIT_API_SECRET,
+      {
+        identity: identity,
+        ttl: "60m", // 60 minutes
+      }
+    );
 
-  // --- NEW FEATURE: ROOM-WIDE CHAT ---
-  socket.on("sendMessage", ({ roomId, text, from, name, time }) => {
-    console.log(`[Room Message]: ${name} in ${roomId}: ${text}`);
-    // Using io.in(roomId) ensures the message reaches EVERYONE in that room
-    io.in(roomId).emit("messageReceived", { 
-      text, 
-      from, 
-      name, 
-      time 
+    at.addGrant({
+      roomJoin: true,
+      room: room,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
     });
-  });
 
-  // --- NEW FEATURE: ROOM-WIDE CODE SYNC ---
-  socket.on("codeUpdate", ({ roomId, code }) => {
-    // Sends code changes to everyone in the room except the person typing
-    socket.to(roomId).emit("codeUpdate", code);
-  });
+    const token = at.toJwt();
 
- socket.on("callUser", ({ from, name: callerName, signal }) => {
-  // Save the call info
-  setCall({ isReceivingCall: true, from, name: callerName, signal });
-  setOtherUser(from);
-  
-  // IMMEDIATELY answer the call if we are already in the room
-  // We use a small timeout to ensure the Peer library is ready
-  setTimeout(() => {
-     answerCall(); 
-  }, 1000);
+    console.log(`Token generated for room: ${room}, identity: ${identity}`);
+    res.json({ token });
+  } catch (error) {
+    console.error("Token generation failed:", error);
+    res.status(500).json({ error: "Failed to generate token" });
+  }
 });
 
-  socket.on("answerCall", (data) => {
-    io.to(data.to).emit("callAccepted", data.signal);
-  });
-
-  // Screen Share Signaling
-  socket.on("shareScreen", ({ to, signal }) => {
-    io.to(to).emit("screenShareStarted", signal);
-  });
-
-  // Cleanup & Termination
-  socket.on("disconnect", () => {
-    activeMeetings.delete(socket.id);
-    socket.broadcast.emit("callEnded");
-    console.log(`[Disconnected]: ${socket.id}`);
-  });
-
-  socket.on("leaveCall", ({ to }) => {
-    io.to(to).emit("callEnded");
-  });
-});
-
-// Binding to 0.0.0.0 is a best practice for Render/Cloud hosting
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 VeloCall Server LIVE on Port: ${PORT}`);
+  console.log(`🚀 VeloCall LiveKit Server LIVE on Port: ${PORT}`);
 });
