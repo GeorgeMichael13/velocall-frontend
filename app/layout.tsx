@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-// Importing the Neural Brain
-import { ContextProvider } from "./context/SocketContext";
+
+// Import the new LiveKit Provider
+import { LiveKitProvider } from "./context/SocketContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "VeloCall | Neural Communication",
-  description: "High-performance WebRTC video platform for elite developers.",
+  description: "High-performance video calls powered by LiveKit",
 };
 
 export default function RootLayout({
@@ -29,9 +30,11 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-velo-dark">
-        {/* Wrapping the app in our Socket Logic */}
-        <ContextProvider>{children}</ContextProvider>
+      <body className="min-h-full flex flex-col bg-[#050505]">
+        {/* LiveKit Provider - Replaces old ContextProvider */}
+        <LiveKitProvider>
+          {children}
+        </LiveKitProvider>
       </body>
     </html>
   );
