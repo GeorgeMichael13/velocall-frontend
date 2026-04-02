@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { VideoOff, Zap, LoaderCircle, UserPlus } from "lucide-react";
 import { useSocket } from "@/app/context/SocketContext";
 import { cn } from "@/lib/utils";
@@ -10,30 +10,54 @@ export default function VideoGrid() {
     useSocket();
 
   const isStreamAttached = useRef(false);
+  const hasPlayed = useRef(false);
+
+  // Memoized play function to avoid recreating on every render
+  const playVideo = useCallback((videoEl: HTMLVideoElement) => {
+    if (videoEl.paused || videoEl.ended) {
+      videoEl.play().catch((err: any) => {
+        // Ignore common non-critical errors
+        if (err.name !== "AbortError" && err.name !== "NotAllowedError") {
+          console.warn("Video play failed:", err);
+        }
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const videoElement = myVideo.current;
+    if (!videoElement || !stream) return;
 
-    if (stream && videoElement) {
-      if (videoElement.srcObject !== stream) {
-        videoElement.srcObject = stream;
-        isStreamAttached.current = true;
-      }
+    // Only attach if it's a different stream (prevents unnecessary re-attachments)
+    if (videoElement.srcObject !== stream) {
+      videoElement.srcObject = stream;
+      isStreamAttached.current = true;
+      hasPlayed.current = false; // Reset play flag when stream changes
+    }
 
-      // Stability Logic: Only play if paused to stop the "AbortError" glitching
-      if (videoElement.paused) {
-        videoElement.play().catch((err: any) => {
-          if (err.name !== "AbortError") {
-            console.warn("Autoplay interaction required", err);
-          }
-        });
-      }
+    // Ensure it plays (especially after camera toggle or stream replacement)
+    if (!hasPlayed.current) {
+      playVideo(videoElement);
+      hasPlayed.current = true;
     }
 
     return () => {
+      // Optional: don't fully stop tracks here unless you own the stream cleanup
       isStreamAttached.current = false;
     };
-  }, [stream]);
+  }, [stream, playVideo]);
+
+  // Separate effect for camera off state (opacity + pause/resume)
+  useEffect(() => {
+    const videoElement = myVideo.current;
+    if (!videoElement) return;
+
+    if (isCameraOff) {
+      videoElement.pause();
+    } else if (stream) {
+      playVideo(videoElement);
+    }
+  }, [isCameraOff, stream, playVideo]);
 
   return (
     <div className="relative flex-1 w-full h-screen bg-[#050505] overflow-hidden flex flex-col">
@@ -48,7 +72,7 @@ export default function VideoGrid() {
       </header>
 
       <div className="flex-1 w-full h-full p-4 flex flex-col md:flex-row gap-4 items-center justify-center">
-        {/* LOCAL FEED */}
+        {/* LOCAL FEED - Mirrored for natural selfie feel */}
         <div
           className={cn(
             "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl transition-all duration-700 w-full aspect-video border border-white/5",
@@ -61,14 +85,13 @@ export default function VideoGrid() {
             playsInline
             muted
             className={cn(
-              "w-full h-full object-cover",
+              "w-full h-full object-cover transition-opacity duration-300",
               isCameraOff ? "opacity-0" : "opacity-100",
             )}
-            /* FIXED: Removed the -1 flip to prevent the 'inverted left' issue. 
-               This will now show the camera's natural selfie orientation. */
+            // ← This is the key fix: mirror the local preview (natural selfie)
             style={{
-              transform: "scaleX(1)",
-              WebkitTransform: "scaleX(1)",
+              transform: "scaleX(-1)",        // Mirror horizontally
+              WebkitTransform: "scaleX(-1)",
             }}
           />
 
@@ -88,7 +111,7 @@ export default function VideoGrid() {
           </div>
         </div>
 
-        {/* REMOTE FEED */}
+        {/* REMOTE FEED - NO mirroring (others should see you naturally) */}
         {callAccepted && !callEnded ? (
           <div className="relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl flex-1 md:max-w-[50%] aspect-video border border-white/5 animate-in fade-in zoom-in-95 duration-700">
             <video
@@ -96,6 +119,7 @@ export default function VideoGrid() {
               autoPlay
               playsInline
               className="w-full h-full object-cover"
+              // No scaleX(-1) here — remote should not be mirrored
             />
             <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5">
               <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider">
