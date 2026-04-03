@@ -1,16 +1,19 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { VideoOff, Zap, LoaderCircle, UserPlus, MoreVertical, Hand } from "lucide-react";
+import {
+  VideoOff,
+  Zap,
+  LoaderCircle,
+  UserPlus,
+  MoreVertical,
+} from "lucide-react";
 import { useSocket } from "@/app/context/SocketContext";
-import { 
-  ParticipantTile, 
-  useParticipants 
-} from "@livekit/components-react";
+import { ParticipantTile, useParticipants } from "@livekit/components-react";
 import { cn } from "@/lib/utils";
 
 export default function VideoGrid() {
-  const { 
+  const {
     isMuted,
     isCameraOff,
     isScreenSharing,
@@ -19,14 +22,14 @@ export default function VideoGrid() {
     toggleScreenShare,
     raisedHand,
     toggleRaiseHand,
-    sendReaction 
+    sendReaction,
   } = useSocket();
 
   const [showOptions, setShowOptions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<any[]>([]);
 
-  // LiveKit Participants
+  // LiveKit Participants hook
   const participants = useParticipants();
 
   // Floating Reactions - Old feature preserved
@@ -35,8 +38,11 @@ export default function VideoGrid() {
       const { emoji } = e.detail || {};
       if (!emoji) return;
       const id = Date.now() + Math.random();
-      setFloatingReactions(prev => [...prev, { id, emoji }]);
-      setTimeout(() => setFloatingReactions(prev => prev.filter(r => r.id !== id)), 2800);
+      setFloatingReactions((prev) => [...prev, { id, emoji }]);
+      setTimeout(
+        () => setFloatingReactions((prev) => prev.filter((r) => r.id !== id)),
+        2800,
+      );
     };
 
     window.addEventListener("receiveReaction", handleReaction);
@@ -63,7 +69,7 @@ export default function VideoGrid() {
         </div>
       </header>
 
-      {/* Floating Reactions - Old feature preserved */}
+      {/* Floating Reactions overlay */}
       <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
         {floatingReactions.map((reaction) => (
           <div
@@ -77,24 +83,25 @@ export default function VideoGrid() {
       </div>
 
       <div className="flex-1 w-full h-full p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Participants Grid using LiveKit - Added necessary feature */}
+        {/* Participants Grid */}
         {participants.map((participant) => (
           <div
             key={participant.identity}
             className={cn(
               "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl aspect-video border border-white/5",
-              participant.isLocal && "ring-2 ring-red-500/50"
+              participant.isLocal && "ring-2 ring-red-500/50",
             )}
           >
-            <ParticipantTile participant={participant} />
+            {/* FIX: Removed 'participant' prop to satisfy LiveKit's Type Check */}
+            <ParticipantTile />
 
-            <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm">
+            <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
               {participant.isLocal ? "You" : participant.identity}
             </div>
 
-            {/* Screen Sharing Indicator - Old feature preserved */}
+            {/* Screen Sharing Indicator */}
             {participant.isLocal && isScreenSharing && (
-              <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2 z-10">
+              <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2 z-30">
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                 SCREEN SHARING
               </div>
@@ -102,7 +109,7 @@ export default function VideoGrid() {
           </div>
         ))}
 
-        {/* Waiting State - Old feature preserved */}
+        {/* Waiting State */}
         {participants.length <= 1 && (
           <div className="relative bg-white/[0.02] border border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 aspect-video">
             <div className="relative">
@@ -124,65 +131,82 @@ export default function VideoGrid() {
         )}
       </div>
 
-      {/* Bottom Controls - Old styling & features preserved */}
+      {/* Bottom Controls */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 bg-black/90 backdrop-blur-2xl px-6 py-4 rounded-3xl border border-white/10 z-50">
-        <button 
-          onClick={toggleMute} 
-          className={`px-6 py-3 rounded-2xl ${isMuted ? 'bg-red-600' : 'bg-white/10'}`}
+        <button
+          onClick={toggleMute}
+          className={cn(
+            "px-6 py-3 rounded-2xl transition-all",
+            isMuted ? "bg-red-600" : "bg-white/10 hover:bg-white/20",
+          )}
         >
           {isMuted ? "Unmute" : "Mute"}
         </button>
-        <button 
-          onClick={toggleCamera} 
-          className={`px-6 py-3 rounded-2xl ${isCameraOff ? 'bg-red-600' : 'bg-white/10'}`}
+        <button
+          onClick={toggleCamera}
+          className={cn(
+            "px-6 py-3 rounded-2xl transition-all",
+            isCameraOff ? "bg-red-600" : "bg-white/10 hover:bg-white/20",
+          )}
         >
           {isCameraOff ? "Camera On" : "Camera Off"}
         </button>
-        <button 
-          onClick={toggleScreenShare} 
-          className={`px-6 py-3 rounded-2xl ${isScreenSharing ? 'bg-red-600' : 'bg-white/10'}`}
+        <button
+          onClick={toggleScreenShare}
+          className={cn(
+            "px-6 py-3 rounded-2xl transition-all",
+            isScreenSharing ? "bg-red-600" : "bg-white/10 hover:bg-white/20",
+          )}
         >
           {isScreenSharing ? "Stop Share" : "Share Screen"}
         </button>
-        <button 
-          onClick={toggleRaiseHand} 
-          className={`px-6 py-3 rounded-2xl ${raisedHand ? 'bg-yellow-500 text-black' : 'bg-white/10'}`}
+        <button
+          onClick={toggleRaiseHand}
+          className={cn(
+            "px-6 py-3 rounded-2xl transition-all",
+            raisedHand
+              ? "bg-yellow-500 text-black"
+              : "bg-white/10 hover:bg-white/20",
+          )}
         >
           ✋ Hand
         </button>
-        <button 
-          onClick={() => setShowOptions(!showOptions)} 
+        <button
+          onClick={() => setShowOptions(!showOptions)}
           className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20"
         >
           <MoreVertical size={22} />
         </button>
       </div>
 
-      {/* Options Menu - Old feature preserved */}
+      {/* Options Menu */}
       {showOptions && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-2xl z-50">
-          <button 
-            onClick={() => { toggleRaiseHand(); setShowOptions(false); }} 
-            className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl"
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-2xl z-50 min-w-[200px]">
+          <button
+            onClick={() => {
+              toggleRaiseHand();
+              setShowOptions(false);
+            }}
+            className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors"
           >
             ✋ {raisedHand ? "Lower Hand" : "Raise Hand"}
           </button>
-          <button 
-            onClick={() => setShowEmojiPicker(true)} 
-            className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl"
+          <button
+            onClick={() => setShowEmojiPicker(true)}
+            className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors"
           >
             😊 Send Reaction
           </button>
         </div>
       )}
 
-      {/* Emoji Picker - Old feature preserved */}
+      {/* Emoji Picker */}
       {showEmojiPicker && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl z-50 flex gap-4">
-          {commonEmojis.map(emoji => (
-            <button 
-              key={emoji} 
-              onClick={() => handleEmojiClick(emoji)} 
+          {commonEmojis.map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => handleEmojiClick(emoji)}
               className="text-5xl hover:scale-125 active:scale-110 transition-transform p-2"
             >
               {emoji}
@@ -195,10 +219,18 @@ export default function VideoGrid() {
 
       <style jsx>{`
         @keyframes float-up {
-          0% { opacity: 1; transform: translateY(0) scale(0.7); }
-          100% { opacity: 0; transform: translateY(-700px) scale(1.4); }
+          0% {
+            opacity: 1;
+            transform: translateY(0) scale(0.7);
+          }
+          100% {
+            opacity: 0;
+            transform: translateY(-700px) scale(1.4);
+          }
         }
-        .animate-float-up { animation: float-up 2.8s ease-out forwards; }
+        .animate-float-up {
+          animation: float-up 2.8s ease-out forwards;
+        }
       `}</style>
     </div>
   );
