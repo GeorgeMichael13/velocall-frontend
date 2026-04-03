@@ -26,9 +26,10 @@ export default function VideoGrid() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<any[]>([]);
 
+  // LiveKit Participants
   const participants = useParticipants();
 
-  // Floating Reactions (Old feature preserved)
+  // Floating Reactions - Old feature preserved
   useEffect(() => {
     const handleReaction = (e: any) => {
       const { emoji } = e.detail || {};
@@ -76,11 +77,14 @@ export default function VideoGrid() {
       </div>
 
       <div className="flex-1 w-full h-full p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* All Participants using LiveKit ParticipantTile */}
+        {/* Participants Grid using LiveKit - Added necessary feature */}
         {participants.map((participant) => (
           <div
             key={participant.identity}
-            className="relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl aspect-video border border-white/5"
+            className={cn(
+              "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl aspect-video border border-white/5",
+              participant.isLocal && "ring-2 ring-red-500/50"
+            )}
           >
             <ParticipantTile participant={participant} />
 
@@ -88,7 +92,7 @@ export default function VideoGrid() {
               {participant.isLocal ? "You" : participant.identity}
             </div>
 
-            {/* Screen Sharing Indicator for Local User */}
+            {/* Screen Sharing Indicator - Old feature preserved */}
             {participant.isLocal && isScreenSharing && (
               <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2 z-10">
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
@@ -120,7 +124,7 @@ export default function VideoGrid() {
         )}
       </div>
 
-      {/* Bottom Controls - Old styling preserved */}
+      {/* Bottom Controls - Old styling & features preserved */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 bg-black/90 backdrop-blur-2xl px-6 py-4 rounded-3xl border border-white/10 z-50">
         <button 
           onClick={toggleMute} 
@@ -186,6 +190,8 @@ export default function VideoGrid() {
           ))}
         </div>
       )}
+
+      <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
 
       <style jsx>{`
         @keyframes float-up {
