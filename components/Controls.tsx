@@ -28,20 +28,15 @@ export default function Controls() {
 
   const [copied, setCopied] = useState(false);
 
-  // Corrected async function logic
   const copyInviteLink = async () => {
     if (!me) {
-      console.error("Socket not connected: 'me' is empty");
+      console.error("User identity not ready");
       return;
     }
 
     try {
-      // Generate the URL based on the current origin and your socket ID
       const inviteUrl = `${window.location.origin}/?id=${me}`;
-
-      // Use the modern Clipboard API
       await navigator.clipboard.writeText(inviteUrl);
-
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -52,10 +47,10 @@ export default function Controls() {
   return (
     <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50">
       <div className="bg-[#111]/80 backdrop-blur-2xl px-6 py-3 rounded-[2.5rem] flex items-center gap-4 shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/10">
-        {/* Invite Peer Button */}
+        {/* Invite Button */}
         <button
           onClick={copyInviteLink}
-          disabled={!me} // Prevents broken links if socket isn't ready
+          disabled={!me}
           className={cn(
             "flex items-center gap-2 px-4 py-3 rounded-full transition-all duration-300 border border-white/5",
             !me && "opacity-50 cursor-not-allowed",
@@ -63,7 +58,7 @@ export default function Controls() {
               ? "bg-green-500/20 text-green-500"
               : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white",
           )}
-          title={me ? "Copy Meeting Link" : "Initializing meeting..."}
+          title={me ? "Copy Meeting Link" : "Initializing..."}
         >
           {copied ? <Check size={18} /> : <Link2 size={18} />}
           <span className="text-[10px] font-bold uppercase tracking-widest hidden md:inline">
@@ -82,7 +77,6 @@ export default function Controls() {
               ? "bg-red-500/20 text-red-500"
               : "bg-white/5 text-white hover:bg-white/10",
           )}
-          title={isMuted ? "Unmute" : "Mute"}
         >
           {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
         </button>
@@ -96,7 +90,6 @@ export default function Controls() {
               ? "bg-red-500/20 text-red-500"
               : "bg-white/5 text-white hover:bg-white/10",
           )}
-          title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
         >
           {isCameraOff ? <VideoOff size={20} /> : <Video size={20} />}
         </button>
@@ -105,7 +98,6 @@ export default function Controls() {
         <button
           onClick={shareScreen}
           className="p-4 rounded-full bg-white/5 text-blue-400 hover:bg-blue-400/10 transition-all"
-          title="Share Screen"
         >
           <ScreenShare size={20} />
         </button>
@@ -117,7 +109,6 @@ export default function Controls() {
             window.location.href = "/";
           }}
           className="mx-2 p-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white shadow-[0_0_30px_rgba(220,38,38,0.4)] transition-all transform hover:scale-110 active:scale-95"
-          title="End Meeting"
         >
           <PhoneOff size={24} fill="currentColor" />
         </button>
