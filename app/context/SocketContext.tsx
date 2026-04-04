@@ -11,7 +11,6 @@ import React, {
 import { LiveKitRoom } from "@livekit/components-react";
 import "@livekit/components-styles";
 
-// This allows the app to work locally and on Netlify automatically
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ||
   "https://velocall-backend.onrender.com";
@@ -20,28 +19,21 @@ type LiveKitContextType = {
   roomName: string | null;
   joinRoom: (room: string) => Promise<void>;
   leaveRoom: () => void;
-  leaveCall: () => void; // Aliased for Controls.tsx
+  leaveCall: () => void;
   isConnected: boolean;
-  me: string; // Added for the invite link logic
-
-  // Media Refs & Streams
+  me: string;
   myVideo: React.RefObject<HTMLVideoElement | null>;
   stream: MediaStream | null;
-
-  // Features
   toggleMute: () => void;
   toggleCamera: () => void;
   toggleScreenShare: () => void;
-  shareScreen: () => void; // Aliased for Controls.tsx
+  shareScreen: () => void;
   sendReaction: (emoji: string) => void;
   toggleRaiseHand: () => void;
-
   isMuted: boolean;
   isCameraOff: boolean;
   isScreenSharing: boolean;
   raisedHand: boolean;
-
-  // Messages & Code Editor
   messages: any[];
   sendMessage: (text: string) => void;
   code: string;
@@ -54,7 +46,7 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
   const [roomName, setRoomName] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [me, setMe] = useState(""); // Initialize empty, set on mount
+  const [me, setMe] = useState("");
 
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
@@ -67,7 +59,6 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
   const myVideo = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
-    // Set a stable identity for the user
     setMe(`user_${Math.floor(Math.random() * 10000)}`);
 
     async function getMedia() {
@@ -90,7 +81,6 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
   const joinRoom = async (room: string) => {
     const identity = me || `user_${Date.now()}`;
     try {
-      // FIX: Use the dynamic BACKEND_URL constant instead of a hardcoded string
       const response = await fetch(`${BACKEND_URL}/api/livekit-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,15 +89,17 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
 
       const data = await response.json();
 
-      if (data.token) {
+      // CORRECTION: Ensure we grab the 'token' property specifically
+      if (data && data.token) {
         setToken(data.token);
         setRoomName(room);
       } else {
-        alert("Failed to join room. Please try again.");
+        console.error("No token found in response:", data);
+        alert("Failed to join room. Server did not provide a token.");
       }
     } catch (error) {
       console.error("Join room error:", error);
-      alert("Could not connect to server. Please check your connection.");
+      alert("Could not connect to the backend server.");
     }
   };
 
@@ -156,7 +148,7 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
         roomName,
         joinRoom,
         leaveRoom,
-        leaveCall: leaveRoom, // Map for Controls.tsx
+        leaveCall: leaveRoom,
         isConnected: !!roomName && !!token,
         me,
         myVideo,
@@ -164,7 +156,7 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
         toggleMute,
         toggleCamera,
         toggleScreenShare,
-        shareScreen: toggleScreenShare, // Map for Controls.tsx
+        shareScreen: toggleScreenShare,
         sendReaction,
         toggleRaiseHand,
         isMuted,
@@ -180,7 +172,10 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
       {roomName && token ? (
         <LiveKitRoom
           token={token}
-          serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL!}
+          serverUrl={
+            process.env.NEXT_PUBLIC_LIVEKIT_URL ||
+            "wss://velocall-8pvaplej.livekit.cloud"
+          }
           connect={true}
           audio={!isMuted}
           video={!isCameraOff}
