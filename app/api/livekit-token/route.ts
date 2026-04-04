@@ -9,9 +9,9 @@ export async function POST(request: NextRequest) {
   try {
     const { room, identity } = await request.json();
 
-    // Check if variables are missing on the server
+    // 1. Critical Config Check
     if (!API_KEY || !API_SECRET) {
-      console.error("SERVER ERROR: LIVEKIT_API_KEY or SECRET is not defined on Render.");
+      console.error("SERVER ERROR: LIVEKIT_API_KEY or SECRET is not defined.");
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
     }
 
@@ -19,13 +19,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Room and identity are required" }, { status: 400 });
     }
 
-    // Create the token
+    // 2. Initialize AccessToken
     const at = new AccessToken(API_KEY, API_SECRET, {
       identity,
-      ttl: "1h", // Increased to 1 hour to prevent mid-call disconnects
+      ttl: "1h", 
     });
 
-    // Grant permissions
+    // 3. Set Permissions
     at.addGrant({
       roomJoin: true,
       room: room,
@@ -34,11 +34,21 @@ export async function POST(request: NextRequest) {
       canPublishData: true,
     });
 
-    // Convert to JWT string
-    const token = await at.toJwt();
+    // 4. Generate and Sanitize Token
+    const rawToken = await at.toJwt();
+    
+    /**
+     * PERMANENT FIX: 
+     * Some SDK versions return an object { token: "..." } instead of a string.
+     * This logic extracts the string so the frontend always gets a flat value.
+     */
+    const finalToken = typeof rawToken === 'string' ? rawToken : (rawToken as any).token;
 
-    // Return the token as a JSON object
-    return NextResponse.json({ token });
+    console.log(`✅ Token generated for ${identity} in room ${room}`);
+
+    // 5. Return clean JSON
+    return NextResponse.json({ token: finalToken });
+
   } catch (error) {
     console.error("Token generation error:", error);
     return NextResponse.json({ error: "Failed to generate token" }, { status: 500 });

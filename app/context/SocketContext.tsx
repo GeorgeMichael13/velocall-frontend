@@ -84,37 +84,38 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
     if (isJoining) return;
     setIsJoining(true);
 
-    const identity = me || `user_${Date.now()}`;
-
     try {
-      console.log(`DEBUG: Fetching token for ${identity} in room ${room}`);
-      const response = await fetch(
-        `${BACKEND_URL}/api/livekit-token?v=${Date.now()}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ room, identity }),
-        },
-      );
-
-      if (!response.ok)
-        throw new Error(`Server responded with ${response.status}`);
+      const response = await fetch(`${BACKEND_URL}/api/livekit-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room, identity: me }),
+      });
 
       const data = await response.json();
       console.log("DEBUG: Parsed JSON data:", data);
 
-      // FIXED: One clean check to verify the string exists
-      if (data && typeof data.token === "string") {
-        setToken(data.token);
+      // DEEP EXTRACTION LOGIC
+      let finalToken = "";
+
+      if (typeof data === "string") {
+        finalToken = data;
+      } else if (data && typeof data.token === "string") {
+        finalToken = data.token;
+      } else if (data && data.token && typeof data.token.token === "string") {
+        // This handles the { token: { token: "..." } } nesting shown in your logs
+        finalToken = data.token.token;
+      }
+
+      if (finalToken) {
+        setToken(finalToken);
         setRoomName(room);
-        console.log("✅ Token state updated with string.");
+        console.log("✅ Successfully extracted string token.");
       } else {
-        console.error("❌ INVALID TOKEN FORMAT:", data);
-        alert(`Error: Received ${typeof data} instead of string token.`);
+        console.error("❌ FAILED TO EXTRACT STRING TOKEN FROM:", data);
+        alert("Token format is incorrect. Check server logs.");
       }
     } catch (error) {
-      console.error("❌ JOIN ROOM ERROR:", error);
-      alert("Could not connect to backend server. Is it awake?");
+      console.error("Join room error:", error);
     } finally {
       setIsJoining(false);
     }
