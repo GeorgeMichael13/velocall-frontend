@@ -80,26 +80,39 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
 
   const joinRoom = async (room: string) => {
     const identity = me || `user_${Date.now()}`;
+    console.log(`DEBUG: Attempting to join room: ${room} as ${identity}`);
+
     try {
-      const response = await fetch(`${BACKEND_URL}/api/livekit-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ room, identity }),
-      });
+      // Added Cache-Buster v=${Date.now()} to prevent stale responses
+      const response = await fetch(
+        `${BACKEND_URL}/api/livekit-token?v=${Date.now()}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ room, identity }),
+        },
+      );
 
       const data = await response.json();
+      console.log("DEBUG: Raw response from backend:", data);
 
-      // CORRECTION: Ensure we grab the 'token' property specifically
-      if (data && data.token) {
+      // STRICTURE CHECK: Prevents [object Object] by verifying type
+      if (data && typeof data.token === "string") {
+        console.log(
+          "DEBUG: Token successfully received and verified as string.",
+        );
         setToken(data.token);
         setRoomName(room);
       } else {
-        console.error("No token found in response:", data);
-        alert("Failed to join room. Server did not provide a token.");
+        console.error(
+          "DEBUG ERROR: Backend returned something other than a string token:",
+          data,
+        );
+        alert(`Token Error: Received ${typeof data.token}. Check console.`);
       }
     } catch (error) {
-      console.error("Join room error:", error);
-      alert("Could not connect to the backend server.");
+      console.error("DEBUG ERROR: Fetch failed entirely:", error);
+      alert("Could not connect to the backend server. Check your BACKEND_URL.");
     }
   };
 
@@ -169,6 +182,9 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
         updateCode,
       }}
     >
+      {/* CRITICAL DEBUG: If token is "[object Object]", the wss:// connection will fail.
+          The check above in joinRoom is designed to stop that before it happens.
+      */}
       {roomName && token ? (
         <LiveKitRoom
           token={token}
