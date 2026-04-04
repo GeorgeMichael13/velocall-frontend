@@ -9,13 +9,15 @@ export async function POST(request: NextRequest) {
   try {
     const { room, identity } = await request.json();
 
-    console.log("--- RENDER ENVIRONMENT DIAGNOSTIC ---");
-    console.log("Room:", room, "Identity:", identity);
+    console.log("--- LIVEKIT TOKEN REQUEST ---");
+    console.log("Room:", room);
+    console.log("Identity:", identity);
     console.log("LIVEKIT_API_KEY present:", !!API_KEY);
+    console.log("LIVEKIT_API_SECRET present:", !!API_SECRET);
     console.log("-------------------------------------");
 
     if (!API_KEY || !API_SECRET) {
-      console.error("SERVER ERROR: LIVEKIT_API_KEY or LIVEKIT_API_SECRET missing in Render env vars.");
+      console.error("SERVER ERROR: LIVEKIT_API_KEY or LIVEKIT_API_SECRET is missing in Render Environment Variables.");
       return NextResponse.json(
         { error: "Server keys not configured. Check Render Environment Variables." },
         { status: 500 }
@@ -23,11 +25,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (!room || !identity) {
-      return NextResponse.json({ error: "Room and identity are required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Room and identity are required" },
+        { status: 400 }
+      );
     }
 
     const at = new AccessToken(API_KEY, API_SECRET, {
       identity,
+      name: identity,        // Optional: shows a friendly name in LiveKit
       ttl: "1h",
     });
 
@@ -39,15 +45,18 @@ export async function POST(request: NextRequest) {
       canPublishData: true,
     });
 
-    const token = await at.toJwt();   // This is always a string in v2.x
+    const token = await at.toJwt();   // This returns a clean string (JWT)
 
-    console.log(`✅ Token generated successfully (length: ${token.length})`);
+    console.log(`✅ Token generated successfully for ${identity} in room ${room}`);
+    console.log(`✅ Token length: ${token.length}`);
 
-    // Return plain string — simplest and most reliable
+    // Return plain string — this is the most reliable for @livekit/components-react
     return NextResponse.json(token);
 
   } catch (error: any) {
     console.error("❌ TOKEN GENERATION ERROR:", error.message);
+    console.error(error.stack); // Helpful for debugging on Render
+
     return NextResponse.json(
       { error: error.message || "Internal Server Error" },
       { status: 500 }

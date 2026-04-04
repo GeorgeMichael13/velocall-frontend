@@ -80,47 +80,45 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
     getMedia();
   }, []);
 
-  const joinRoom = async (room: string) => {
-    if (isJoining) return;
-    setIsJoining(true);
+ const joinRoom = async (room: string) => {
+  if (isJoining) return;
+  setIsJoining(true);
 
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/livekit-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ room, identity: me }),
-      });
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/livekit-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room, identity: me }),
+    });
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Handle both cases: plain string OR { token: "..." }
-      let actualToken =
-        typeof data === "string"
-          ? data
-          : data?.token && typeof data.token === "string"
-            ? data.token
-            : null;
-
-      if (actualToken && actualToken.startsWith("ey")) {
-        setToken(actualToken);
-        setRoomName(room);
-        console.log("✅ Token successfully validated and set.");
-      } else {
-        console.error("❌ Invalid token received:", data);
-        alert("Failed to generate valid token. Check server logs on Render.");
-      }
-    } catch (error) {
-      console.error("Join error:", error);
-      alert("Failed to join room. Check console and Render logs.");
-    } finally {
-      setIsJoining(false);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
-  };
+
+    const data = await response.json();
+
+    // Handle both plain string AND { token: "eyJ..." }
+    const actualToken = typeof data === "string" 
+      ? data 
+      : data?.token && typeof data.token === "string" 
+        ? data.token 
+        : null;
+
+    if (actualToken && actualToken.startsWith("ey")) {
+      setToken(actualToken);
+      setRoomName(room);
+      console.log("✅ Token set successfully!");
+    } else {
+      console.error("❌ Received invalid token data:", data);
+      alert("Token format error. Check backend response.");
+    }
+  } catch (error: any) {
+    console.error("Join room error:", error);
+    alert("Failed to join room — check console and Render logs.");
+  } finally {
+    setIsJoining(false);
+  }
+};
   const leaveRoom = () => {
     setRoomName(null);
     setToken(null);
