@@ -21,6 +21,7 @@ type LiveKitContextType = {
   leaveRoom: () => void;
   leaveCall: () => void;
   isConnected: boolean;
+  isJoining: boolean; // New feature: Loading state
   me: string;
   myVideo: React.RefObject<HTMLVideoElement | null>;
   stream: MediaStream | null;
@@ -45,6 +46,7 @@ const LiveKitContext = createContext<LiveKitContextType | null>(null);
 export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
   const [roomName, setRoomName] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [me, setMe] = useState("");
 
@@ -79,11 +81,12 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const joinRoom = async (room: string) => {
+    if (isJoining) return;
+    setIsJoining(true);
+
     const identity = me || `user_${Date.now()}`;
-    console.log(`DEBUG: Attempting to join room: ${room} as ${identity}`);
 
     try {
-      // Added Cache-Buster v=${Date.now()} to prevent stale responses
       const response = await fetch(
         `${BACKEND_URL}/api/livekit-token?v=${Date.now()}`,
         {
@@ -94,25 +97,20 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
       );
 
       const data = await response.json();
-      console.log("DEBUG: Raw response from backend:", data);
 
-      // STRICTURE CHECK: Prevents [object Object] by verifying type
+      // CRITICAL FIX: Ensure we only set the token string, not the whole object
       if (data && typeof data.token === "string") {
-        console.log(
-          "DEBUG: Token successfully received and verified as string.",
-        );
         setToken(data.token);
         setRoomName(room);
       } else {
-        console.error(
-          "DEBUG ERROR: Backend returned something other than a string token:",
-          data,
-        );
-        alert(`Token Error: Received ${typeof data.token}. Check console.`);
+        console.error("Invalid token format received:", data);
+        alert("Server returned an invalid token. Check backend keys.");
       }
     } catch (error) {
-      console.error("DEBUG ERROR: Fetch failed entirely:", error);
-      alert("Could not connect to the backend server. Check your BACKEND_URL.");
+      console.error("Join room error:", error);
+      alert("Failed to connect to backend.");
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -163,6 +161,7 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
         leaveRoom,
         leaveCall: leaveRoom,
         isConnected: !!roomName && !!token,
+        isJoining,
         me,
         myVideo,
         stream,
@@ -182,9 +181,6 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
         updateCode,
       }}
     >
-      {/* CRITICAL DEBUG: If token is "[object Object]", the wss:// connection will fail.
-          The check above in joinRoom is designed to stop that before it happens.
-      */}
       {roomName && token ? (
         <LiveKitRoom
           token={token}
