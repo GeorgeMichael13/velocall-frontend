@@ -92,30 +92,28 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
       });
 
       const data = await response.json();
-      console.log("DEBUG: Parsed JSON data:", data);
 
-      // DEEP EXTRACTION LOGIC
-      let finalToken = "";
+      // DRILL DOWN LOGIC: Find the string no matter where it is
+      let actualToken = "";
 
-      if (typeof data === "string") {
-        finalToken = data;
-      } else if (data && typeof data.token === "string") {
-        finalToken = data.token;
-      } else if (data && data.token && typeof data.token.token === "string") {
-        // This handles the { token: { token: "..." } } nesting shown in your logs
-        finalToken = data.token.token;
+      if (typeof data.token === "string") {
+        actualToken = data.token;
+      } else if (data.token && typeof data.token.token === "string") {
+        actualToken = data.token.token;
+      } else if (typeof data === "string") {
+        actualToken = data;
       }
 
-      if (finalToken) {
-        setToken(finalToken);
+      if (actualToken && actualToken.startsWith("ey")) {
+        setToken(actualToken);
         setRoomName(room);
-        console.log("✅ Successfully extracted string token.");
+        console.log("✅ Token successfully validated and set.");
       } else {
-        console.error("❌ FAILED TO EXTRACT STRING TOKEN FROM:", data);
-        alert("Token format is incorrect. Check server logs.");
+        console.error("❌ Still received an object:", data);
+        alert("Token generation failed. Check Render Environment Variables.");
       }
     } catch (error) {
-      console.error("Join room error:", error);
+      console.error("Join error:", error);
     } finally {
       setIsJoining(false);
     }
