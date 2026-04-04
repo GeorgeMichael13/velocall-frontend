@@ -21,7 +21,7 @@ type LiveKitContextType = {
   leaveRoom: () => void;
   leaveCall: () => void;
   isConnected: boolean;
-  isJoining: boolean; // New feature: Loading state
+  isJoining: boolean;
   me: string;
   myVideo: React.RefObject<HTMLVideoElement | null>;
   stream: MediaStream | null;
@@ -87,6 +87,7 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
     const identity = me || `user_${Date.now()}`;
 
     try {
+      console.log(`DEBUG: Fetching token for ${identity} in room ${room}`);
       const response = await fetch(
         `${BACKEND_URL}/api/livekit-token?v=${Date.now()}`,
         {
@@ -96,27 +97,24 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
         },
       );
 
+      if (!response.ok)
+        throw new Error(`Server responded with ${response.status}`);
+
       const data = await response.json();
-      console.log("DEBUG: Raw response from backend:", data);
+      console.log("DEBUG: Parsed JSON data:", data);
 
-      // ❌ WRONG: setToken(data);
-      // ✅ RIGHT: Access the 'token' key specifically
-      if (data && data.token) {
-        setToken(data.token);
-        setRoomName(room);
-      }
-
-      // CRITICAL FIX: Ensure we only set the token string, not the whole object
+      // FIXED: One clean check to verify the string exists
       if (data && typeof data.token === "string") {
         setToken(data.token);
         setRoomName(room);
+        console.log("✅ Token state updated with string.");
       } else {
-        console.error("Invalid token format received:", data);
-        alert("Server returned an invalid token. Check backend keys.");
+        console.error("❌ INVALID TOKEN FORMAT:", data);
+        alert(`Error: Received ${typeof data} instead of string token.`);
       }
     } catch (error) {
-      console.error("Join room error:", error);
-      alert("Failed to connect to backend.");
+      console.error("❌ JOIN ROOM ERROR:", error);
+      alert("Could not connect to backend server. Is it awake?");
     } finally {
       setIsJoining(false);
     }
@@ -199,6 +197,9 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
           connect={true}
           audio={!isMuted}
           video={!isCameraOff}
+          onConnected={() => console.log("🚀 LiveKit Room Connected!")}
+          onDisconnected={() => console.log("🔌 LiveKit Room Disconnected")}
+          onError={(e) => console.error("🔥 LiveKit Connection Error:", e)}
         >
           {children}
         </LiveKitRoom>
