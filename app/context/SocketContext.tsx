@@ -97,6 +97,14 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
       );
 
       const data = await response.json();
+      console.log("DEBUG: Raw response from backend:", data);
+
+      // ❌ WRONG: setToken(data);
+      // ✅ RIGHT: Access the 'token' key specifically
+      if (data && data.token) {
+        setToken(data.token);
+        setRoomName(room);
+      }
 
       // CRITICAL FIX: Ensure we only set the token string, not the whole object
       if (data && typeof data.token === "string") {
