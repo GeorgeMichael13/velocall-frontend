@@ -91,34 +91,36 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify({ room, identity: me }),
       });
 
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${response.status}`);
+      }
+
       const data = await response.json();
 
-      // DRILL DOWN LOGIC: Find the string no matter where it is
-      let actualToken = "";
-
-      if (typeof data.token === "string") {
-        actualToken = data.token;
-      } else if (data.token && typeof data.token.token === "string") {
-        actualToken = data.token.token;
-      } else if (typeof data === "string") {
-        actualToken = data;
-      }
+      // Handle both cases: plain string OR { token: "..." }
+      let actualToken =
+        typeof data === "string"
+          ? data
+          : data?.token && typeof data.token === "string"
+            ? data.token
+            : null;
 
       if (actualToken && actualToken.startsWith("ey")) {
         setToken(actualToken);
         setRoomName(room);
         console.log("✅ Token successfully validated and set.");
       } else {
-        console.error("❌ Still received an object:", data);
-        alert("Token generation failed. Check Render Environment Variables.");
+        console.error("❌ Invalid token received:", data);
+        alert("Failed to generate valid token. Check server logs on Render.");
       }
     } catch (error) {
       console.error("Join error:", error);
+      alert("Failed to join room. Check console and Render logs.");
     } finally {
       setIsJoining(false);
     }
   };
-
   const leaveRoom = () => {
     setRoomName(null);
     setToken(null);
