@@ -11,6 +11,11 @@ import React, {
 import { LiveKitRoom } from "@livekit/components-react";
 import "@livekit/components-styles";
 
+// This allows the app to work locally and on Netlify automatically
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  "https://velocall-backend.onrender.com";
+
 type LiveKitContextType = {
   roomName: string | null;
   joinRoom: (room: string) => Promise<void>;
@@ -85,14 +90,12 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
   const joinRoom = async (room: string) => {
     const identity = me || `user_${Date.now()}`;
     try {
-      const response = await fetch(
-        "https://velocall-backend.onrender.com/api/livekit-token",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ room, identity }),
-        },
-      );
+      // FIX: Use the dynamic BACKEND_URL constant instead of a hardcoded string
+      const response = await fetch(`${BACKEND_URL}/api/livekit-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room, identity }),
+      });
 
       const data = await response.json();
 
