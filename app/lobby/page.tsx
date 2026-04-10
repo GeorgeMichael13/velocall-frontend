@@ -7,23 +7,21 @@ import {
   MicOff,
   Video,
   VideoOff,
-  Copy,
-  Check,
   Zap,
   Calendar,
   Plus,
   ArrowRight,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Import your meeting component (adjust path if needed)
-import VideoGrid from "@/app/components/VideoGrid";   // ← Change this to your actual meeting component
+import VideoGrid from "./VideoGrid";   // Make sure path is correct. If it's in components folder, adjust accordingly
 
 export default function Lobby() {
   const {
     joinRoom,
     isConnected,
-    roomName,        // Important
+    roomName,
     leaveRoom,
     toggleMute,
     isMuted,
@@ -34,7 +32,6 @@ export default function Lobby() {
   } = useSocket();
 
   const [idToCall, setIdToCall] = useState("");
-  const [copied, setCopied] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -59,13 +56,22 @@ export default function Lobby() {
     }
   };
 
-  // ←←← THIS IS THE KEY FIX
-  // If connected to a room, show the meeting interface instead of lobby
-  if (isConnected && roomName) {
-    return <VideoGrid roomName={roomName} onLeave={leaveRoom} />;
-  }
+  const copyInviteLink = () => {
+    if (!idToCall) return;
+    const link = `${window.location.origin}/?id=${idToCall}`;
+    navigator.clipboard.writeText(link);
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 1800);
+  };
 
-  // Lobby UI (only shown when not in a meeting)
+  // ==================== MAIN FIX ====================
+  // Show VideoGrid when connected to a room
+  if (isConnected && roomName) {
+    return <VideoGrid />;
+  }
+  // =================================================
+
+  // Original Lobby UI (unchanged)
   return (
     <main className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 font-sans overflow-hidden relative">
       <div className="absolute inset-0 bg-[radial-gradient(at_50%_30%,rgba(185,28,28,0.08)_0%,transparent_50%)]" />
