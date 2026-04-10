@@ -31,7 +31,7 @@ export default function VideoGrid() {
 
   const participants = useParticipants();
 
-  // Floating Reactions — your original feature (unchanged)
+  // Floating Reactions - your original feature (unchanged)
   useEffect(() => {
     const handleReaction = (e: any) => {
       const { emoji } = e.detail || {};
@@ -68,7 +68,7 @@ export default function VideoGrid() {
         </div>
       </header>
 
-      {/* Floating Reactions — unchanged */}
+      {/* Floating Reactions - unchanged */}
       <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
         {floatingReactions.map((reaction) => (
           <div
@@ -90,7 +90,7 @@ export default function VideoGrid() {
               participant.isLocal && "ring-2 ring-red-500/50"
             )}
           >
-            {/* Permanent fix: Use TrackLoop context pattern via key + ParticipantTile */}
+            {/* Permanent fix for TrackRef error */}
             <ParticipantTile />
 
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
