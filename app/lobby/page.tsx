@@ -14,13 +14,17 @@ import {
   Plus,
   ArrowRight,
 } from "lucide-react";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
+
+// Import your meeting component (adjust path if needed)
+import VideoGrid from "@/app/components/VideoGrid";   // ← Change this to your actual meeting component
 
 export default function Lobby() {
   const {
-    joinRoom, // New from LiveKit
+    joinRoom,
     isConnected,
+    roomName,        // Important
+    leaveRoom,
     toggleMute,
     isMuted,
     toggleCamera,
@@ -34,7 +38,7 @@ export default function Lobby() {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Attach stream to local video (natural mirror)
+  // Attach stream to local video
   useEffect(() => {
     if (stream && myVideo.current) {
       myVideo.current.srcObject = stream;
@@ -42,32 +46,26 @@ export default function Lobby() {
     }
   }, [stream]);
 
-  const copyId = () => {
-    // For LiveKit, we don't have 'me' anymore, so we can skip or use a placeholder
-    alert("Meeting ID is the room name you create");
-  };
-
-  const copyInviteLink = () => {
-    if (!idToCall) return;
-    const link = `${window.location.origin}/?id=${idToCall}`;
-    navigator.clipboard.writeText(link);
-    setInviteCopied(true);
-    setTimeout(() => setInviteCopied(false), 1800);
-  };
-
   const handleCreateMeeting = async () => {
     setIsLoading(true);
     const newRoomId = Math.random().toString(36).substring(2, 10);
-    await joinRoom(newRoomId); // Use LiveKit joinRoom
+    await joinRoom(newRoomId);
     setIsLoading(false);
   };
 
   const handleJoinMeeting = () => {
-    if (idToCall) {
-      joinRoom(idToCall);
+    if (idToCall.trim()) {
+      joinRoom(idToCall.trim());
     }
   };
 
+  // ←←← THIS IS THE KEY FIX
+  // If connected to a room, show the meeting interface instead of lobby
+  if (isConnected && roomName) {
+    return <VideoGrid roomName={roomName} onLeave={leaveRoom} />;
+  }
+
+  // Lobby UI (only shown when not in a meeting)
   return (
     <main className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 font-sans overflow-hidden relative">
       <div className="absolute inset-0 bg-[radial-gradient(at_50%_30%,rgba(185,28,28,0.08)_0%,transparent_50%)]" />
@@ -89,10 +87,7 @@ export default function Lobby() {
               playsInline
               muted
               className="w-full h-full object-cover"
-              style={{
-                transform: "scaleX(-1)",
-                WebkitTransform: "scaleX(-1)",
-              }}
+              style={{ transform: "scaleX(-1)" }}
             />
 
             {isCameraOff && (
@@ -109,9 +104,7 @@ export default function Lobby() {
                 onClick={toggleMute}
                 className={cn(
                   "p-3.5 rounded-xl transition-all",
-                  isMuted
-                    ? "bg-red-500/90 text-white hover:bg-red-600"
-                    : "bg-white/10 hover:bg-white/20 text-white",
+                  isMuted ? "bg-red-500/90 text-white hover:bg-red-600" : "bg-white/10 hover:bg-white/20 text-white"
                 )}
               >
                 {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
@@ -121,9 +114,7 @@ export default function Lobby() {
                 onClick={toggleCamera}
                 className={cn(
                   "p-3.5 rounded-xl transition-all",
-                  isCameraOff
-                    ? "bg-red-500/90 text-white hover:bg-red-600"
-                    : "bg-white/10 hover:bg-white/20 text-white",
+                  isCameraOff ? "bg-red-500/90 text-white hover:bg-red-600" : "bg-white/10 hover:bg-white/20 text-white"
                 )}
               >
                 {isCameraOff ? <VideoOff size={22} /> : <Video size={22} />}
@@ -132,9 +123,7 @@ export default function Lobby() {
 
             <div className="absolute top-6 left-6 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-xs font-medium tracking-widest uppercase">
-                LIVE PREVIEW
-              </span>
+              <span className="text-xs font-medium tracking-widest uppercase">LIVE PREVIEW</span>
             </div>
           </div>
 
@@ -144,17 +133,10 @@ export default function Lobby() {
               disabled={isLoading}
               className={cn(
                 "flex items-center justify-center gap-3 bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-semibold text-lg transition-all active:scale-[0.985]",
-                isLoading && "opacity-60 cursor-not-allowed",
+                isLoading && "opacity-60 cursor-not-allowed"
               )}
             >
-              {isLoading ? (
-                "Creating..."
-              ) : (
-                <>
-                  {" "}
-                  <Plus size={24} /> New Instant Meeting{" "}
-                </>
-              )}
+              {isLoading ? "Creating..." : <> <Plus size={24} /> New Instant Meeting </>}
             </button>
 
             <button
@@ -162,16 +144,9 @@ export default function Lobby() {
               className="flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 py-4 rounded-2xl font-semibold transition-all text-sm uppercase tracking-widest"
             >
               {inviteCopied ? (
-                <>
-                  {" "}
-                  <Check size={22} className="text-green-500" /> Link
-                  Copied{" "}
-                </>
+                <> <Check size={22} className="text-green-500" /> Link Copied </>
               ) : (
-                <>
-                  {" "}
-                  <Calendar size={22} /> Get Link for Later{" "}
-                </>
+                <> <Calendar size={22} /> Get Link for Later </>
               )}
             </button>
           </div>
@@ -203,7 +178,7 @@ export default function Lobby() {
                 onClick={handleJoinMeeting}
                 className={cn(
                   "absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 bg-red-600 hover:bg-red-700 px-8 py-3 rounded-xl font-semibold transition-all",
-                  !idToCall && "opacity-40 pointer-events-none",
+                  !idToCall && "opacity-40 pointer-events-none"
                 )}
               >
                 Join <ArrowRight size={20} />
