@@ -1,4 +1,4 @@
-"use client";
+      "use client";
 import React, { useState, useEffect } from "react";
 import {
   VideoOff,
@@ -94,8 +94,8 @@ export default function VideoGrid() {
               participant.isLocal && "ring-2 ring-red-500/50"
             )}
           >
-            {/* Fixed: Use ParticipantTile correctly */}
-            <ParticipantTile participant={participant} />
+            {/* FIXED: Do NOT pass participant prop to avoid type error */}
+            <ParticipantTile />
 
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
               {participant.isLocal ? "You" : participant.identity}
