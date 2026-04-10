@@ -1,4 +1,4 @@
-"use client";
+                  "use client";
 import React, { useState, useEffect } from "react";
 import {
   VideoOff,
@@ -6,7 +6,7 @@ import {
   LoaderCircle,
   UserPlus,
   MoreVertical,
-  PhoneOff,        // Added for Leave button
+  PhoneOff,
 } from "lucide-react";
 import { useSocket } from "@/app/context/SocketContext";
 import { ParticipantTile, useParticipants } from "@livekit/components-react";
@@ -23,7 +23,7 @@ export default function VideoGrid() {
     raisedHand,
     toggleRaiseHand,
     sendReaction,
-    leaveRoom,           // ← Added
+    leaveRoom,
   } = useSocket();
 
   const [showOptions, setShowOptions] = useState(false);
@@ -32,17 +32,14 @@ export default function VideoGrid() {
 
   const participants = useParticipants();
 
-  // Floating Reactions - Old feature preserved
+  // Floating Reactions (your old feature)
   useEffect(() => {
     const handleReaction = (e: any) => {
       const { emoji } = e.detail || {};
       if (!emoji) return;
       const id = Date.now() + Math.random();
       setFloatingReactions((prev) => [...prev, { id, emoji }]);
-      setTimeout(
-        () => setFloatingReactions((prev) => prev.filter((r) => r.id !== id)),
-        2800,
-      );
+      setTimeout(() => setFloatingReactions((prev) => prev.filter((r) => r.id !== id)), 2800);
     };
     window.addEventListener("receiveReaction", handleReaction);
     return () => window.removeEventListener("receiveReaction", handleReaction);
@@ -72,7 +69,7 @@ export default function VideoGrid() {
         </div>
       </header>
 
-      {/* Floating Reactions overlay */}
+      {/* Floating Reactions */}
       <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
         {floatingReactions.map((reaction) => (
           <div
@@ -91,13 +88,16 @@ export default function VideoGrid() {
             key={participant.identity}
             className={cn(
               "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl aspect-video border border-white/5",
-              participant.isLocal && "ring-2 ring-red-500/50",
+              participant.isLocal && "ring-2 ring-red-500/50"
             )}
           >
+            {/* This is the correct usage for your version */}
             <ParticipantTile />
+
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
               {participant.isLocal ? "You" : participant.identity}
             </div>
+
             {participant.isLocal && isScreenSharing && (
               <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2 z-30">
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
@@ -120,9 +120,7 @@ export default function VideoGrid() {
               <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em]">
                 Waiting for others to join
               </p>
-              <p className="text-white/10 text-[9px]">
-                Share your meeting link
-              </p>
+              <p className="text-white/10 text-[9px]">Share your meeting link</p>
             </div>
           </div>
         )}
@@ -130,76 +128,35 @@ export default function VideoGrid() {
 
       {/* Bottom Controls */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 bg-black/90 backdrop-blur-2xl px-6 py-4 rounded-3xl border border-white/10 z-50">
-        <button
-          onClick={toggleMute}
-          className={cn(
-            "px-6 py-3 rounded-2xl transition-all",
-            isMuted ? "bg-red-600" : "bg-white/10 hover:bg-white/20",
-          )}
-        >
+        <button onClick={toggleMute} className={cn("px-6 py-3 rounded-2xl transition-all", isMuted ? "bg-red-600" : "bg-white/10 hover:bg-white/20")}>
           {isMuted ? "Unmute" : "Mute"}
         </button>
-        <button
-          onClick={toggleCamera}
-          className={cn(
-            "px-6 py-3 rounded-2xl transition-all",
-            isCameraOff ? "bg-red-600" : "bg-white/10 hover:bg-white/20",
-          )}
-        >
+        <button onClick={toggleCamera} className={cn("px-6 py-3 rounded-2xl transition-all", isCameraOff ? "bg-red-600" : "bg-white/10 hover:bg-white/20")}>
           {isCameraOff ? "Camera On" : "Camera Off"}
         </button>
-        <button
-          onClick={toggleScreenShare}
-          className={cn(
-            "px-6 py-3 rounded-2xl transition-all",
-            isScreenSharing ? "bg-red-600" : "bg-white/10 hover:bg-white/20",
-          )}
-        >
+        <button onClick={toggleScreenShare} className={cn("px-6 py-3 rounded-2xl transition-all", isScreenSharing ? "bg-red-600" : "bg-white/10 hover:bg-white/20")}>
           {isScreenSharing ? "Stop Share" : "Share Screen"}
         </button>
-        <button
-          onClick={toggleRaiseHand}
-          className={cn(
-            "px-6 py-3 rounded-2xl transition-all",
-            raisedHand ? "bg-yellow-500 text-black" : "bg-white/10 hover:bg-white/20",
-          )}
-        >
+        <button onClick={toggleRaiseHand} className={cn("px-6 py-3 rounded-2xl transition-all", raisedHand ? "bg-yellow-500 text-black" : "bg-white/10 hover:bg-white/20")}>
           ✋ Hand
         </button>
 
-        {/* Leave Meeting Button */}
-        <button
-          onClick={handleLeaveMeeting}
-          className="px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 transition-all flex items-center gap-2"
-        >
-          <PhoneOff size={20} />
-          Leave
+        <button onClick={handleLeaveMeeting} className="px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 transition-all flex items-center gap-2">
+          <PhoneOff size={20} /> Leave
         </button>
 
-        <button
-          onClick={() => setShowOptions(!showOptions)}
-          className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20"
-        >
+        <button onClick={() => setShowOptions(!showOptions)} className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20">
           <MoreVertical size={22} />
         </button>
       </div>
 
-      {/* Options Menu & Emoji Picker - unchanged */}
+      {/* Options & Emoji Picker (unchanged) */}
       {showOptions && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-2xl z-50 min-w-[200px]">
-          <button
-            onClick={() => {
-              toggleRaiseHand();
-              setShowOptions(false);
-            }}
-            className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors"
-          >
+          <button onClick={() => { toggleRaiseHand(); setShowOptions(false); }} className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors">
             ✋ {raisedHand ? "Lower Hand" : "Raise Hand"}
           </button>
-          <button
-            onClick={() => setShowEmojiPicker(true)}
-            className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors"
-          >
+          <button onClick={() => setShowEmojiPicker(true)} className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors">
             😊 Send Reaction
           </button>
         </div>
@@ -208,11 +165,7 @@ export default function VideoGrid() {
       {showEmojiPicker && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl z-50 flex gap-4">
           {commonEmojis.map((emoji) => (
-            <button
-              key={emoji}
-              onClick={() => handleEmojiClick(emoji)}
-              className="text-5xl hover:scale-125 active:scale-110 transition-transform p-2"
-            >
+            <button key={emoji} onClick={() => handleEmojiClick(emoji)} className="text-5xl hover:scale-125 active:scale-110 transition-transform p-2">
               {emoji}
             </button>
           ))}
@@ -226,9 +179,7 @@ export default function VideoGrid() {
           0% { opacity: 1; transform: translateY(0) scale(0.7); }
           100% { opacity: 0; transform: translateY(-700px) scale(1.4); }
         }
-        .animate-float-up {
-          animation: float-up 2.8s ease-out forwards;
-        }
+        .animate-float-up { animation: float-up 2.8s ease-out forwards; }
       `}</style>
     </div>
   );
