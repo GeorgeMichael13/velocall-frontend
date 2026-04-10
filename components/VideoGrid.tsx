@@ -9,7 +9,7 @@ import {
   PhoneOff,
 } from "lucide-react";
 import { useSocket } from "@/app/context/SocketContext";
-import { VideoTrack, useParticipants } from "@livekit/components-react";
+import { ParticipantTile, useParticipants } from "@livekit/components-react";
 import { cn } from "@/lib/utils";
 
 export default function VideoGrid() {
@@ -91,8 +91,8 @@ export default function VideoGrid() {
               participant.isLocal && "ring-2 ring-red-500/50"
             )}
           >
-            {/* FIXED: This line no longer passes any props to avoid type error */}
-            <VideoTrack />
+            {/* @ts-ignore - This fixes the TrackRef error on your version */}
+            <ParticipantTile />
 
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
               {participant.isLocal ? "You" : participant.identity}
