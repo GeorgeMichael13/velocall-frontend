@@ -100,7 +100,6 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
 
       const data = await response.json();
 
-      // Improved token extraction with detailed logging
       let actualToken: string | null = null;
 
       if (typeof data === "string") {
@@ -110,7 +109,6 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
         actualToken = data.token;
         console.log("✅ Received token inside { token: '...' } object");
       } else if (data && typeof data === "object") {
-        // Last resort: search for any JWT-like string in the object
         for (const key in data) {
           if (typeof data[key] === "string" && data[key].startsWith("ey")) {
             actualToken = data[key];
@@ -126,7 +124,6 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
         console.log("🎉 Token successfully validated and set! Length:", actualToken.length);
       } else {
         console.error("❌ Failed to extract valid token. Received data:", data);
-        console.error("Data type received:", typeof data);
         alert("Token generation failed. Please check Render logs and console.");
       }
     } catch (error: any) {
