@@ -14,7 +14,7 @@ import {
   Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import VideoGrid from "@/components/VideoGrid";
+import VideoGrid from "../components/VideoGrid";
 ";   // Make sure path is correct. If it's in components folder, adjust accordingly
 
 export default function Lobby() {
