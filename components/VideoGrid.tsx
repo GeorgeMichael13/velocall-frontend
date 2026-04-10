@@ -32,7 +32,7 @@ export default function VideoGrid() {
 
   const participants = useParticipants();
 
-  // Floating Reactions - your original feature (unchanged)
+  // Floating Reactions - your original feature (100% unchanged)
   useEffect(() => {
     const handleReaction = (e: any) => {
       const { emoji } = e.detail || {};
@@ -91,7 +91,7 @@ export default function VideoGrid() {
               participant.isLocal && "ring-2 ring-red-500/50"
             )}
           >
-            {/* @ts-ignore - This fixes the TrackRef error on your version */}
+            {/* @ts-ignore - This fixes the No TrackRef error on your LiveKit version */}
             <ParticipantTile />
 
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
