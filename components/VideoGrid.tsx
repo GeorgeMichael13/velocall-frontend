@@ -8,7 +8,7 @@ import {
   PhoneOff,
 } from "lucide-react";
 import { useSocket } from "@/app/context/SocketContext";
-import { ParticipantTile, useParticipants } from "@livekit/components-react";
+import { VideoTrack, useParticipants } from "@livekit/components-react";
 import { cn } from "@/lib/utils";
 
 export default function VideoGrid() {
@@ -90,8 +90,8 @@ export default function VideoGrid() {
               participant.isLocal && "ring-2 ring-red-500/50"
             )}
           >
-            {/* Permanent fix for TrackRef error */}
-            <ParticipantTile />
+            {/* Permanent fix: Use VideoTrack with source */}
+            <VideoTrack participant={participant} source="camera" />
 
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
               {participant.isLocal ? "You" : participant.identity}
