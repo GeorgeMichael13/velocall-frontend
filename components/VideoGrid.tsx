@@ -1,4 +1,4 @@
-                  "use client";
+"use client";
 import React, { useState, useEffect } from "react";
 import {
   VideoOff,
@@ -9,7 +9,7 @@ import {
   PhoneOff,
 } from "lucide-react";
 import { useSocket } from "@/app/context/SocketContext";
-import { ParticipantTile, useParticipants } from "@livekit/components-react";
+import { VideoTrack, useParticipants } from "@livekit/components-react";   // Changed import
 import { cn } from "@/lib/utils";
 
 export default function VideoGrid() {
@@ -32,7 +32,7 @@ export default function VideoGrid() {
 
   const participants = useParticipants();
 
-  // Floating Reactions (your old feature)
+  // Floating Reactions (your old feature - unchanged)
   useEffect(() => {
     const handleReaction = (e: any) => {
       const { emoji } = e.detail || {};
@@ -91,8 +91,8 @@ export default function VideoGrid() {
               participant.isLocal && "ring-2 ring-red-500/50"
             )}
           >
-            {/* This is the correct usage for your version */}
-            <ParticipantTile />
+            {/* FIXED: Use VideoTrack instead of ParticipantTile */}
+            <VideoTrack participant={participant} />
 
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
               {participant.isLocal ? "You" : participant.identity}
@@ -128,44 +128,73 @@ export default function VideoGrid() {
 
       {/* Bottom Controls */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 bg-black/90 backdrop-blur-2xl px-6 py-4 rounded-3xl border border-white/10 z-50">
-        <button onClick={toggleMute} className={cn("px-6 py-3 rounded-2xl transition-all", isMuted ? "bg-red-600" : "bg-white/10 hover:bg-white/20")}>
+        <button
+          onClick={toggleMute}
+          className={cn("px-6 py-3 rounded-2xl transition-all", isMuted ? "bg-red-600" : "bg-white/10 hover:bg-white/20")}
+        >
           {isMuted ? "Unmute" : "Mute"}
         </button>
-        <button onClick={toggleCamera} className={cn("px-6 py-3 rounded-2xl transition-all", isCameraOff ? "bg-red-600" : "bg-white/10 hover:bg-white/20")}>
+        <button
+          onClick={toggleCamera}
+          className={cn("px-6 py-3 rounded-2xl transition-all", isCameraOff ? "bg-red-600" : "bg-white/10 hover:bg-white/20")}
+        >
           {isCameraOff ? "Camera On" : "Camera Off"}
         </button>
-        <button onClick={toggleScreenShare} className={cn("px-6 py-3 rounded-2xl transition-all", isScreenSharing ? "bg-red-600" : "bg-white/10 hover:bg-white/20")}>
+        <button
+          onClick={toggleScreenShare}
+          className={cn("px-6 py-3 rounded-2xl transition-all", isScreenSharing ? "bg-red-600" : "bg-white/10 hover:bg-white/20")}
+        >
           {isScreenSharing ? "Stop Share" : "Share Screen"}
         </button>
-        <button onClick={toggleRaiseHand} className={cn("px-6 py-3 rounded-2xl transition-all", raisedHand ? "bg-yellow-500 text-black" : "bg-white/10 hover:bg-white/20")}>
+        <button
+          onClick={toggleRaiseHand}
+          className={cn("px-6 py-3 rounded-2xl transition-all", raisedHand ? "bg-yellow-500 text-black" : "bg-white/10 hover:bg-white/20")}
+        >
           ✋ Hand
         </button>
 
-        <button onClick={handleLeaveMeeting} className="px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 transition-all flex items-center gap-2">
+        <button
+          onClick={handleLeaveMeeting}
+          className="px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 transition-all flex items-center gap-2"
+        >
           <PhoneOff size={20} /> Leave
         </button>
 
-        <button onClick={() => setShowOptions(!showOptions)} className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20">
+        <button
+          onClick={() => setShowOptions(!showOptions)}
+          className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20"
+        >
           <MoreVertical size={22} />
         </button>
       </div>
 
-      {/* Options & Emoji Picker (unchanged) */}
+      {/* Options Menu */}
       {showOptions && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-2xl z-50 min-w-[200px]">
-          <button onClick={() => { toggleRaiseHand(); setShowOptions(false); }} className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors">
+          <button
+            onClick={() => { toggleRaiseHand(); setShowOptions(false); }}
+            className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors"
+          >
             ✋ {raisedHand ? "Lower Hand" : "Raise Hand"}
           </button>
-          <button onClick={() => setShowEmojiPicker(true)} className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors">
+          <button
+            onClick={() => setShowEmojiPicker(true)}
+            className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors"
+          >
             😊 Send Reaction
           </button>
         </div>
       )}
 
+      {/* Emoji Picker */}
       {showEmojiPicker && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl z-50 flex gap-4">
           {commonEmojis.map((emoji) => (
-            <button key={emoji} onClick={() => handleEmojiClick(emoji)} className="text-5xl hover:scale-125 active:scale-110 transition-transform p-2">
+            <button
+              key={emoji}
+              onClick={() => handleEmojiClick(emoji)}
+              className="text-5xl hover:scale-125 active:scale-110 transition-transform p-2"
+            >
               {emoji}
             </button>
           ))}
