@@ -1,239 +1,201 @@
-      "use client";
+"use client";
+
 import React, { useState, useEffect } from "react";
+import { useSocket } from "@/app/context/SocketContext";
 import {
+  Mic,
+  MicOff,
+  Video,
   VideoOff,
   Zap,
-  LoaderCircle,
-  UserPlus,
-  MoreVertical,
-  PhoneOff,
+  Calendar,
+  Plus,
+  ArrowRight,
+  Check,
 } from "lucide-react";
-import { useSocket } from "@/app/context/SocketContext";
-import { ParticipantTile, useParticipants } from "@livekit/components-react";
 import { cn } from "@/lib/utils";
 
-export default function VideoGrid() {
+// Correct import based on your folder structure
+import VideoGrid from "@/components/VideoGrid";
+
+export default function Lobby() {
   const {
-    isMuted,
-    isCameraOff,
-    isScreenSharing,
-    toggleMute,
-    toggleCamera,
-    toggleScreenShare,
-    raisedHand,
-    toggleRaiseHand,
-    sendReaction,
+    joinRoom,
+    isConnected,
+    roomName,
     leaveRoom,
+    toggleMute,
+    isMuted,
+    toggleCamera,
+    isCameraOff,
+    myVideo,
+    stream,
   } = useSocket();
 
-  const [showOptions, setShowOptions] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [floatingReactions, setFloatingReactions] = useState<any[]>([]);
+  const [idToCall, setIdToCall] = useState("");
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const participants = useParticipants();
-
-  // Floating Reactions - preserved
+  // Attach stream to local video
   useEffect(() => {
-    const handleReaction = (e: any) => {
-      const { emoji } = e.detail || {};
-      if (!emoji) return;
-      const id = Date.now() + Math.random();
-      setFloatingReactions((prev) => [...prev, { id, emoji }]);
-      setTimeout(
-        () => setFloatingReactions((prev) => prev.filter((r) => r.id !== id)),
-        2800,
-      );
-    };
-    window.addEventListener("receiveReaction", handleReaction);
-    return () => window.removeEventListener("receiveReaction", handleReaction);
-  }, []);
+    if (stream && myVideo.current) {
+      myVideo.current.srcObject = stream;
+      myVideo.current.play().catch(() => {});
+    }
+  }, [stream]);
 
-  const handleEmojiClick = (emoji: string) => {
-    sendReaction(emoji);
-    setShowEmojiPicker(false);
-    setShowOptions(false);
+  const handleCreateMeeting = async () => {
+    setIsLoading(true);
+    const newRoomId = Math.random().toString(36).substring(2, 10);
+    await joinRoom(newRoomId);
+    setIsLoading(false);
   };
 
-  const commonEmojis = ["👍", "❤️", "😂", "🔥", "👏", "😮", "🙌"];
-
-  const handleLeaveMeeting = () => {
-    leaveRoom();
+  const handleJoinMeeting = () => {
+    if (idToCall.trim()) {
+      joinRoom(idToCall.trim());
+    }
   };
+
+  const copyInviteLink = () => {
+    if (!idToCall) return;
+    const link = `${window.location.origin}/?id=${idToCall}`;
+    navigator.clipboard.writeText(link);
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 1800);
+  };
+
+  // Show VideoGrid when connected to a room
+  if (isConnected && roomName) {
+    return <VideoGrid />;
+  }
 
   return (
-    <div className="relative flex-1 w-full h-screen bg-[#050505] overflow-hidden flex flex-col">
-      <header className="absolute top-6 left-0 w-full z-50 flex items-center justify-center pointer-events-none">
-        <div className="flex items-center gap-2 animate-bounce py-1.5 px-4 bg-white/5 backdrop-blur-2xl rounded-full border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
-          <Zap className="text-yellow-400 w-3 h-3 fill-yellow-400" />
-          <h1 className="text-sm font-black tracking-[0.3em] uppercase bg-gradient-to-r from-red-500 via-orange-400 to-yellow-500 bg-clip-text text-transparent">
-            Velocall
-          </h1>
-          <Zap className="text-yellow-400 w-3 h-3 fill-yellow-400 rotate-180" />
-        </div>
-      </header>
+    <main className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 font-sans overflow-hidden relative">
+      <div className="absolute inset-0 bg-[radial-gradient(at_50%_30%,rgba(185,28,28,0.08)_0%,transparent_50%)]" />
 
-      {/* Floating Reactions */}
-      <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
-        {floatingReactions.map((reaction) => (
-          <div
-            key={reaction.id}
-            className="absolute text-6xl animate-float-up"
-            style={{ left: `${Math.random() * 75 + 12.5}%`, bottom: "-50px" }}
-          >
-            {reaction.emoji}
-          </div>
-        ))}
+      <div className="absolute top-10 flex items-center gap-2 animate-bounce z-20">
+        <Zap className="text-yellow-400 w-5 h-5 fill-yellow-400" />
+        <h1 className="text-lg font-black tracking-[0.5em] uppercase bg-gradient-to-r from-red-500 via-orange-400 to-yellow-500 bg-clip-text text-transparent">
+          VELOCALL
+        </h1>
       </div>
 
-      <div className="flex-1 w-full h-full p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {participants.map((participant) => (
-          <div
-            key={participant.identity}
-            className={cn(
-              "relative bg-[#111] rounded-3xl overflow-hidden shadow-2xl aspect-video border border-white/5",
-              participant.isLocal && "ring-2 ring-red-500/50"
-            )}
-          >
-            {/* FIXED: Do NOT pass participant prop to avoid type error */}
-            <ParticipantTile />
+      <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center z-10 mt-12">
+        {/* LEFT: VIDEO PREVIEW */}
+        <div className="space-y-8">
+          <div className="relative aspect-video w-full bg-[#0A0A0A] rounded-3xl overflow-hidden border border-white/10 shadow-2xl group">
+            <video
+              ref={myVideo}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+              style={{ transform: "scaleX(-1)" }}
+            />
 
-            <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
-              {participant.isLocal ? "You" : participant.identity}
-            </div>
-
-            {participant.isLocal && isScreenSharing && (
-              <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2 z-30">
-                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                SCREEN SHARING
+            {isCameraOff && (
+              <div className="absolute inset-0 flex items-center justify-center bg-[#0D0D0D]/90">
+                <div className="text-center">
+                  <VideoOff className="mx-auto text-white/20 mb-3" size={64} />
+                  <p className="text-white/40 text-sm">Camera is off</p>
+                </div>
               </div>
             )}
-          </div>
-        ))}
 
-        {participants.length <= 1 && (
-          <div className="relative bg-white/[0.02] border border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 aspect-video">
-            <div className="relative">
-              <div className="absolute inset-0 bg-red-500/20 blur-2xl rounded-full animate-pulse" />
-              <div className="relative w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                <UserPlus className="text-white/20 w-6 h-6" />
-              </div>
-              <LoaderCircle className="absolute -top-1 -right-1 text-red-500 w-5 h-5 animate-spin" />
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 bg-black/70 backdrop-blur-2xl rounded-2xl border border-white/10 opacity-0 group-hover:opacity-100 transition-all duration-300">
+              <button
+                onClick={toggleMute}
+                className={cn(
+                  "p-3.5 rounded-xl transition-all",
+                  isMuted ? "bg-red-500/90 text-white hover:bg-red-600" : "bg-white/10 hover:bg-white/20 text-white"
+                )}
+              >
+                {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
+              </button>
+
+              <button
+                onClick={toggleCamera}
+                className={cn(
+                  "p-3.5 rounded-xl transition-all",
+                  isCameraOff ? "bg-red-500/90 text-white hover:bg-red-600" : "bg-white/10 hover:bg-white/20 text-white"
+                )}
+              >
+                {isCameraOff ? <VideoOff size={22} /> : <Video size={22} />}
+              </button>
             </div>
-            <div className="text-center space-y-1">
-              <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em]">
-                Waiting for others to join
-              </p>
-              <p className="text-white/10 text-[9px]">Share your meeting link</p>
+
+            <div className="absolute top-6 left-6 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              <span className="text-xs font-medium tracking-widest uppercase">LIVE PREVIEW</span>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Bottom Controls */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 bg-black/90 backdrop-blur-2xl px-6 py-4 rounded-3xl border border-white/10 z-50">
-        <button
-          onClick={toggleMute}
-          className={cn(
-            "px-6 py-3 rounded-2xl transition-all",
-            isMuted ? "bg-red-600" : "bg-white/10 hover:bg-white/20"
-          )}
-        >
-          {isMuted ? "Unmute" : "Mute"}
-        </button>
-
-        <button
-          onClick={toggleCamera}
-          className={cn(
-            "px-6 py-3 rounded-2xl transition-all",
-            isCameraOff ? "bg-red-600" : "bg-white/10 hover:bg-white/20"
-          )}
-        >
-          {isCameraOff ? "Camera On" : "Camera Off"}
-        </button>
-
-        <button
-          onClick={toggleScreenShare}
-          className={cn(
-            "px-6 py-3 rounded-2xl transition-all",
-            isScreenSharing ? "bg-red-600" : "bg-white/10 hover:bg-white/20"
-          )}
-        >
-          {isScreenSharing ? "Stop Share" : "Share Screen"}
-        </button>
-
-        <button
-          onClick={toggleRaiseHand}
-          className={cn(
-            "px-6 py-3 rounded-2xl transition-all",
-            raisedHand ? "bg-yellow-500 text-black" : "bg-white/10 hover:bg-white/20"
-          )}
-        >
-          ✋ Hand
-        </button>
-
-        <button
-          onClick={handleLeaveMeeting}
-          className="px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 transition-all flex items-center gap-2"
-        >
-          <PhoneOff size={20} />
-          Leave
-        </button>
-
-        <button
-          onClick={() => setShowOptions(!showOptions)}
-          className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20"
-        >
-          <MoreVertical size={22} />
-        </button>
-      </div>
-
-      {/* Options Menu */}
-      {showOptions && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-2xl z-50 min-w-[200px]">
-          <button
-            onClick={() => {
-              toggleRaiseHand();
-              setShowOptions(false);
-            }}
-            className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors"
-          >
-            ✋ {raisedHand ? "Lower Hand" : "Raise Hand"}
-          </button>
-          <button
-            onClick={() => setShowEmojiPicker(true)}
-            className="block w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors"
-          >
-            😊 Send Reaction
-          </button>
-        </div>
-      )}
-
-      {/* Emoji Picker */}
-      {showEmojiPicker && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl z-50 flex gap-4">
-          {commonEmojis.map((emoji) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
-              key={emoji}
-              onClick={() => handleEmojiClick(emoji)}
-              className="text-5xl hover:scale-125 active:scale-110 transition-transform p-2"
+              onClick={handleCreateMeeting}
+              disabled={isLoading}
+              className={cn(
+                "flex items-center justify-center gap-3 bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-semibold text-lg transition-all active:scale-[0.985]",
+                isLoading && "opacity-60 cursor-not-allowed"
+              )}
             >
-              {emoji}
+              {isLoading ? "Creating..." : <> <Plus size={24} /> New Instant Meeting </>}
             </button>
-          ))}
+
+            <button
+              onClick={copyInviteLink}
+              className="flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 py-4 rounded-2xl font-semibold transition-all text-sm uppercase tracking-widest"
+            >
+              {inviteCopied ? (
+                <> <Check size={22} className="text-green-500" /> Link Copied </>
+              ) : (
+                <> <Calendar size={22} /> Get Link for Later </>
+              )}
+            </button>
+          </div>
         </div>
-      )}
 
-      <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+        {/* RIGHT: JOIN SECTION */}
+        <div className="space-y-10">
+          <div>
+            <h1 className="text-6xl font-black tracking-tighter leading-none mb-4">
+              Make Video calls,
+              <br />
+              <span className="text-red-600">instantly.</span>
+            </h1>
+            <p className="text-white/50 text-xl max-w-md">
+              Fast, secure, and beautiful video meetings. No sign-up required.
+            </p>
+          </div>
 
-      <style jsx>{`
-        @keyframes float-up {
-          0% { opacity: 1; transform: translateY(0) scale(0.7); }
-          100% { opacity: 0; transform: translateY(-700px) scale(1.4); }
-        }
-        .animate-float-up {
-          animation: float-up 2.8s ease-out forwards;
-        }
-      `}</style>
-    </div>
+          <div className="space-y-6">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Paste meeting code or link"
+                value={idToCall}
+                onChange={(e) => setIdToCall(e.target.value.trim())}
+                className="w-full bg-[#111] border border-white/10 focus:border-red-600 rounded-2xl px-6 py-5 text-lg placeholder:text-white/30 focus:outline-none transition-all"
+              />
+              <button
+                onClick={handleJoinMeeting}
+                className={cn(
+                  "absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 bg-red-600 hover:bg-red-700 px-8 py-3 rounded-xl font-semibold transition-all",
+                  !idToCall && "opacity-40 pointer-events-none"
+                )}
+              >
+                Join <ArrowRight size={20} />
+              </button>
+            </div>
+          </div>
+
+          <p className="text-white/30 text-sm text-center lg:text-left">
+            Powered by LiveKit • End-to-end encrypted
+          </p>
+        </div>
+      </div>
+    </main>
   );
 }
+      
