@@ -32,7 +32,7 @@ export default function VideoGrid() {
 
   const participants = useParticipants();
 
-  // Floating Reactions
+  // Floating Reactions - preserved
   useEffect(() => {
     const handleReaction = (e: any) => {
       const { emoji } = e.detail || {};
@@ -94,7 +94,7 @@ export default function VideoGrid() {
               participant.isLocal && "ring-2 ring-red-500/50"
             )}
           >
-            {/* FIXED: Pass the participant explicitly */}
+            {/* Fixed: Use ParticipantTile correctly */}
             <ParticipantTile participant={participant} />
 
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
@@ -187,7 +187,7 @@ export default function VideoGrid() {
         </button>
       </div>
 
-      {/* Options & Emoji Picker */}
+      {/* Options Menu */}
       {showOptions && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-2xl z-50 min-w-[200px]">
           <button
@@ -208,6 +208,7 @@ export default function VideoGrid() {
         </div>
       )}
 
+      {/* Emoji Picker */}
       {showEmojiPicker && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl z-50 flex gap-4">
           {commonEmojis.map((emoji) => (
