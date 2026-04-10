@@ -85,6 +85,8 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
     setIsJoining(true);
 
     try {
+      console.log(`🔄 Requesting token for room: ${room}, identity: ${me}`);
+
       const response = await fetch(`${BACKEND_URL}/api/livekit-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,34 +94,49 @@ export const LiveKitProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();
 
-      // Handle both plain string AND { token: "..." } (in case you switch back)
-      const actualToken =
-        typeof data === "string"
-          ? data
-          : data?.token && typeof data.token === "string"
-            ? data.token
-            : null;
+      // Improved token extraction with detailed logging
+      let actualToken: string | null = null;
+
+      if (typeof data === "string") {
+        actualToken = data;
+        console.log("✅ Received token as plain string");
+      } else if (data && typeof data.token === "string") {
+        actualToken = data.token;
+        console.log("✅ Received token inside { token: '...' } object");
+      } else if (data && typeof data === "object") {
+        // Last resort: search for any JWT-like string in the object
+        for (const key in data) {
+          if (typeof data[key] === "string" && data[key].startsWith("ey")) {
+            actualToken = data[key];
+            console.log(`✅ Found JWT string in object key: ${key}`);
+            break;
+          }
+        }
+      }
 
       if (actualToken && actualToken.startsWith("ey")) {
         setToken(actualToken);
         setRoomName(room);
-        console.log("✅ Token successfully validated and set.");
+        console.log("🎉 Token successfully validated and set! Length:", actualToken.length);
       } else {
-        console.error("❌ Received invalid token data:", data);
-        alert("Token generation failed. Check Render logs.");
+        console.error("❌ Failed to extract valid token. Received data:", data);
+        console.error("Data type received:", typeof data);
+        alert("Token generation failed. Please check Render logs and console.");
       }
-    } catch (error) {
-      console.error("Join error:", error);
-      alert("Failed to join room. Check console and Render logs.");
+    } catch (error: any) {
+      console.error("❌ Join room error:", error.message);
+      alert(`Failed to join room: ${error.message}`);
     } finally {
       setIsJoining(false);
     }
   };
+
   const leaveRoom = () => {
     setRoomName(null);
     setToken(null);
