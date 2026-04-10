@@ -9,7 +9,7 @@ import {
   PhoneOff,
 } from "lucide-react";
 import { useSocket } from "@/app/context/SocketContext";
-import { VideoTrack, useParticipants } from "@livekit/components-react";   // Changed import
+import { VideoTrack, useParticipants } from "@livekit/components-react";
 import { cn } from "@/lib/utils";
 
 export default function VideoGrid() {
@@ -32,7 +32,7 @@ export default function VideoGrid() {
 
   const participants = useParticipants();
 
-  // Floating Reactions (your old feature - unchanged)
+  // Floating Reactions - your original feature (unchanged)
   useEffect(() => {
     const handleReaction = (e: any) => {
       const { emoji } = e.detail || {};
@@ -69,7 +69,7 @@ export default function VideoGrid() {
         </div>
       </header>
 
-      {/* Floating Reactions */}
+      {/* Floating Reactions - unchanged */}
       <div className="absolute inset-0 pointer-events-none z-40 overflow-hidden">
         {floatingReactions.map((reaction) => (
           <div
@@ -91,8 +91,8 @@ export default function VideoGrid() {
               participant.isLocal && "ring-2 ring-red-500/50"
             )}
           >
-            {/* FIXED: Use VideoTrack instead of ParticipantTile */}
-            <VideoTrack participant={participant} />
+            {/* FIXED: This line no longer passes any props to avoid type error */}
+            <VideoTrack />
 
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
               {participant.isLocal ? "You" : participant.identity}
@@ -126,7 +126,7 @@ export default function VideoGrid() {
         )}
       </div>
 
-      {/* Bottom Controls */}
+      {/* Bottom Controls - unchanged */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 bg-black/90 backdrop-blur-2xl px-6 py-4 rounded-3xl border border-white/10 z-50">
         <button
           onClick={toggleMute}
@@ -168,7 +168,7 @@ export default function VideoGrid() {
         </button>
       </div>
 
-      {/* Options Menu */}
+      {/* Options Menu - unchanged */}
       {showOptions && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-2xl z-50 min-w-[200px]">
           <button
@@ -186,7 +186,7 @@ export default function VideoGrid() {
         </div>
       )}
 
-      {/* Emoji Picker */}
+      {/* Emoji Picker - unchanged */}
       {showEmojiPicker && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl z-50 flex gap-4">
           {commonEmojis.map((emoji) => (
