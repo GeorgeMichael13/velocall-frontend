@@ -13,9 +13,10 @@ import {
   ArrowRight,
   Check,
 } from "lucide-react";
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
+
+// Correct import based on your folder structure
 import VideoGrid from "@/components/VideoGrid";
-";   // Make sure path is correct. If it's in components folder, adjust accordingly
 
 export default function Lobby() {
   const {
@@ -64,14 +65,11 @@ export default function Lobby() {
     setTimeout(() => setInviteCopied(false), 1800);
   };
 
-  // ==================== MAIN FIX ====================
   // Show VideoGrid when connected to a room
   if (isConnected && roomName) {
     return <VideoGrid />;
   }
-  // =================================================
 
-  // Original Lobby UI (unchanged)
   return (
     <main className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6 font-sans overflow-hidden relative">
       <div className="absolute inset-0 bg-[radial-gradient(at_50%_30%,rgba(185,28,28,0.08)_0%,transparent_50%)]" />
