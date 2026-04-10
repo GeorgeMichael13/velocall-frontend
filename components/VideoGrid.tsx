@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import {
   VideoOff,
@@ -7,6 +6,7 @@ import {
   LoaderCircle,
   UserPlus,
   MoreVertical,
+  PhoneOff,        // Added for Leave button
 } from "lucide-react";
 import { useSocket } from "@/app/context/SocketContext";
 import { ParticipantTile, useParticipants } from "@livekit/components-react";
@@ -23,13 +23,13 @@ export default function VideoGrid() {
     raisedHand,
     toggleRaiseHand,
     sendReaction,
+    leaveRoom,           // ← Added
   } = useSocket();
 
   const [showOptions, setShowOptions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<any[]>([]);
 
-  // LiveKit Participants hook
   const participants = useParticipants();
 
   // Floating Reactions - Old feature preserved
@@ -44,7 +44,6 @@ export default function VideoGrid() {
         2800,
       );
     };
-
     window.addEventListener("receiveReaction", handleReaction);
     return () => window.removeEventListener("receiveReaction", handleReaction);
   }, []);
@@ -56,6 +55,10 @@ export default function VideoGrid() {
   };
 
   const commonEmojis = ["👍", "❤️", "😂", "🔥", "👏", "😮", "🙌"];
+
+  const handleLeaveMeeting = () => {
+    leaveRoom();
+  };
 
   return (
     <div className="relative flex-1 w-full h-screen bg-[#050505] overflow-hidden flex flex-col">
@@ -83,7 +86,6 @@ export default function VideoGrid() {
       </div>
 
       <div className="flex-1 w-full h-full p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Participants Grid */}
         {participants.map((participant) => (
           <div
             key={participant.identity}
@@ -92,14 +94,10 @@ export default function VideoGrid() {
               participant.isLocal && "ring-2 ring-red-500/50",
             )}
           >
-            {/* FIX: Removed 'participant' prop to satisfy LiveKit's Type Check */}
             <ParticipantTile />
-
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-lg text-sm z-20">
               {participant.isLocal ? "You" : participant.identity}
             </div>
-
-            {/* Screen Sharing Indicator */}
             {participant.isLocal && isScreenSharing && (
               <div className="absolute top-4 left-4 bg-red-600 text-white text-xs px-3 py-1 rounded-full flex items-center gap-2 z-30">
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
@@ -109,7 +107,6 @@ export default function VideoGrid() {
           </div>
         ))}
 
-        {/* Waiting State */}
         {participants.length <= 1 && (
           <div className="relative bg-white/[0.02] border border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 aspect-video">
             <div className="relative">
@@ -164,13 +161,21 @@ export default function VideoGrid() {
           onClick={toggleRaiseHand}
           className={cn(
             "px-6 py-3 rounded-2xl transition-all",
-            raisedHand
-              ? "bg-yellow-500 text-black"
-              : "bg-white/10 hover:bg-white/20",
+            raisedHand ? "bg-yellow-500 text-black" : "bg-white/10 hover:bg-white/20",
           )}
         >
           ✋ Hand
         </button>
+
+        {/* Leave Meeting Button */}
+        <button
+          onClick={handleLeaveMeeting}
+          className="px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 transition-all flex items-center gap-2"
+        >
+          <PhoneOff size={20} />
+          Leave
+        </button>
+
         <button
           onClick={() => setShowOptions(!showOptions)}
           className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20"
@@ -179,7 +184,7 @@ export default function VideoGrid() {
         </button>
       </div>
 
-      {/* Options Menu */}
+      {/* Options Menu & Emoji Picker - unchanged */}
       {showOptions && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-4 shadow-2xl z-50 min-w-[200px]">
           <button
@@ -200,7 +205,6 @@ export default function VideoGrid() {
         </div>
       )}
 
-      {/* Emoji Picker */}
       {showEmojiPicker && (
         <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl z-50 flex gap-4">
           {commonEmojis.map((emoji) => (
@@ -219,14 +223,8 @@ export default function VideoGrid() {
 
       <style jsx>{`
         @keyframes float-up {
-          0% {
-            opacity: 1;
-            transform: translateY(0) scale(0.7);
-          }
-          100% {
-            opacity: 0;
-            transform: translateY(-700px) scale(1.4);
-          }
+          0% { opacity: 1; transform: translateY(0) scale(0.7); }
+          100% { opacity: 0; transform: translateY(-700px) scale(1.4); }
         }
         .animate-float-up {
           animation: float-up 2.8s ease-out forwards;
